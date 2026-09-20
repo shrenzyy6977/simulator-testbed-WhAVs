@@ -1,6 +1,6 @@
-# Simulator Testbed (WhAVs) — Foundations of Robotics, Group 1
+# Simulator Testbed for Wheeled Autonomous Vehicles (WhAVs)
 
-Course project for **Foundations of Robotics**. Topic: **Simulator testbed (WhAVs)**.
+Foundations of Robotics — course project, **Group 1**.
 
 ## Team
 
@@ -12,31 +12,39 @@ Course project for **Foundations of Robotics**. Topic: **Simulator testbed (WhAV
 | Sparsh Garg | IIT2023186 | sparshga | BTech |
 | Malay Kumar Jain | MRM2025003 | jainmalaykumar | MTech |
 
-## Goal
+## Project summary
 
-TODO: 2-3 sentences on what this testbed will do (fill in from the project brief).
+We are building a software simulator / testbed for **Wheeled Autonomous Vehicles (WhAVs)**.
+Topic and base work were confirmed with our TA.
 
-## Setup
+- **Base paper:** J.-L. Blanco-Claraco et al., "MultiVehicle Simulator (MVSim): Lightweight dynamics simulator for multiagents and mobile robotics research", SoftwareX 23 (2023) 101443, https://doi.org/10.1016/j.softx.2023.101443
+- **Base code:** https://github.com/MRPT/mvsim (docs: https://mvsimulator.readthedocs.io)
+- **Scope / our contribution:** TODO (fill in once agreed with the TA)
+
+## Repository layout
+
+```
+external/mvsim/   upstream MVSim (git submodule, pinned to a known commit)  [if added]
+worlds/           our own MVSim world files (.xml)
+scripts/          our Python clients and experiment scripts
+src/testbed/      our own code
+experiments/      experiment configs and results
+docs/             literature notes, simulator comparison, weekly progress logs
+report/           submitted progress reports (PDF)
+```
+
+## Getting started (Ubuntu or WSL2 on Windows)
+
+MVSim's documented install path is via ROS 2 packages (see https://mvsimulator.readthedocs.io/en/latest/install.html):
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python scripts/hello_sim.py         # headless baseline check
-python scripts/hello_sim.py --gui   # with 3D viewer
+# after installing ROS 2 for your Ubuntu version
+sudo apt install ros-$ROS_DISTRO-mvsim
+ros2 launch mvsim demo_warehouse.launch.py
 ```
 
-Outputs (trajectory CSV/plot and a snapshot) are written to `experiments/results/`.
-
-## Repository structure
-
-```
-scripts/       runnable entry points (hello_sim.py = baseline environment check)
-src/testbed/   testbed code (vehicle models, scenarios, logging)
-experiments/   experiment configs and results
-docs/          literature notes, simulator comparison, weekly progress logs
-report/        submitted progress reports (PDF)
-```
+Building from source is described on the same page. Record the exact steps that worked
+for us (OS, versions, problems) in `docs/progress/`.
 
 ## Workflow
 

@@ -1,13 +1,32 @@
 # Simulator comparison
 
-Fill each cell only after actually trying the simulator.
+## Qualitative comparison reported in the MVSim paper (Table 1, SoftwareX 2023)
 
-| Simulator | Install effort | Vehicle support | Python API | Needs GPU/ROS? | Notes | Verdict |
-|---|---|---|---|---|---|---|
-| PyBullet | TODO | TODO | TODO | TODO | TODO | TODO |
-| Gazebo (+ ROS 2) | TODO | TODO | TODO | TODO | TODO | TODO |
-| CARLA | TODO | TODO | TODO | TODO | TODO | TODO |
-| Webots | TODO | TODO | TODO | TODO | TODO | TODO |
+Copied from the paper for reference. Verify against current versions before relying on it.
+
+| | Gazebo | Webots | MVSim |
+|---|---|---|---|
+| Creation | 2011 | 1996 | 2014 |
+| Physics engine | DART | ODE | Hybrid (Box2D plus custom physics solvers) |
+| 3D engine | OGRE | Custom | MRPT |
+| Interfaces | C++, Python, ROS | C++, Python, ROS, MATLAB, Java | C++, Python, ROS |
+| World files | SDF | VRML | XML |
+| Robotics sensors | Yes (plugins) | Yes | Yes |
+| Ground vehicles | Yes | Yes | Yes |
+| UAVs | Yes | Yes | Not yet |
+| Custom tire-ground force models | No | No | Yes |
+| Approximated fast 2D lidar | No | No | Yes |
+| License | Apache-2.0 | Apache-2.0 | BSD-3 |
+
+## Our own observations
+
+Fill in only what we have actually tried.
+
+| Simulator | Install effort | What we ran | Notes |
+|---|---|---|---|
+| MVSim | TODO | TODO | TODO |
+| Gazebo | TODO | TODO | TODO |
+| Webots | TODO | TODO | TODO |
 
 ## Decision
-TODO: which simulator we are using and why (link to the issue/discussion).
+TODO: what we are building on and why.
