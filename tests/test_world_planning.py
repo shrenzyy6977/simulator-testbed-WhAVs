@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
+from testbed.planning.astar import plan_path
 from testbed.planning.path import make_path
 from testbed.world.grid_map import GridMap
 
@@ -18,6 +19,13 @@ def test_raycast_hits_wall_at_expected_distance():
 def test_map_yaml_loads_and_has_obstacles():
     m = GridMap.from_yaml(ROOT / "worlds" / "grid" / "warehouse.yaml")
     assert m.grid.any() and not m.is_free(13.5, 10) and m.is_free(5, 5)
+
+
+def test_astar_path_is_collision_free():
+    m = GridMap.from_yaml(ROOT / "worlds" / "grid" / "warehouse.yaml")
+    p = plan_path(m, (4, 5), (55, 35), clearance=2.5)
+    assert np.hypot(p.x[-1] - 55, p.y[-1] - 35) < 0.5
+    assert all(m.is_free(x, y) for x, y in zip(p.x, p.y))
 
 
 def test_test_paths_have_consistent_geometry():
