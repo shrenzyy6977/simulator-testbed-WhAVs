@@ -11,3 +11,4 @@ build/
 install/
 log/
 experiments/results/*.mp4
+.pytest_cache/
