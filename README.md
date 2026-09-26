@@ -46,6 +46,18 @@ ros2 launch mvsim demo_warehouse.launch.py
 Building from source is described on the same page. Record the exact steps that worked
 for us (OS, versions, problems) in `docs/progress/`.
 
+## Python testbed (`src/testbed`)
+
+A lightweight 2D Python testbed that follows MVSim's architecture (world, vehicles, sensors,
+simulation loop). It lets us develop and benchmark planners and path-tracking controllers on any
+laptop, without a ROS install. Work in progress.
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python tests/run_all.py          # or: pytest -q
+```
+
 ## Workflow
 
 - Work on a branch named `feature/<name>-<task>` and open a PR into `main`.
