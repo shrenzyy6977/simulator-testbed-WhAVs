@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<!-- Larger 6-wheel skid-steer rover (no rocker-bogie), used to check that a second robot loads
+     through the same URDF adapter. Joint names use left/right instead of the l/r suffix.
+     Dimensions and masses are placeholders. -->
+<robot name="rover6wd">
+  <mujoco>
+    <compiler discardvisual="false" fusestatic="false" balanceinertia="true"/>
+  </mujoco>
+
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0"/>
+      <mass value="5.0"/>
+      <inertia ixx="0.042" iyy="0.092" izz="0.126" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <collision>
+      <geometry><box size="0.44 0.26 0.10"/></geometry>
+    </collision>
+    <visual>
+      <geometry><box size="0.44 0.26 0.10"/></geometry>
+    </visual>
+  </link>
+
+  <!-- wheels: radius 0.065 m, width 0.05 m, 0.15 m apart (they must not touch); track 0.36 m -->
+  <link name="wheel_left_front">
+    <inertial><mass value="0.3"/><inertia ixx="3.8e-4" iyy="6.3e-4" izz="3.8e-4" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.065" length="0.05"/></geometry></collision>
+  </link>
+  <link name="wheel_right_front">
+    <inertial><mass value="0.3"/><inertia ixx="3.8e-4" iyy="6.3e-4" izz="3.8e-4" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.065" length="0.05"/></geometry></collision>
+  </link>
+  <link name="wheel_left_middle">
+    <inertial><mass value="0.3"/><inertia ixx="3.8e-4" iyy="6.3e-4" izz="3.8e-4" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.065" length="0.05"/></geometry></collision>
+  </link>
+  <link name="wheel_right_middle">
+    <inertial><mass value="0.3"/><inertia ixx="3.8e-4" iyy="6.3e-4" izz="3.8e-4" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.065" length="0.05"/></geometry></collision>
+  </link>
+  <link name="wheel_left_rear">
+    <inertial><mass value="0.3"/><inertia ixx="3.8e-4" iyy="6.3e-4" izz="3.8e-4" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.065" length="0.05"/></geometry></collision>
+  </link>
+  <link name="wheel_right_rear">
+    <inertial><mass value="0.3"/><inertia ixx="3.8e-4" iyy="6.3e-4" izz="3.8e-4" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.065" length="0.05"/></geometry></collision>
+  </link>
+
+  <joint name="wheel_left_front_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_left_front"/>
+    <origin xyz="0.15 0.18 -0.05"/><axis xyz="0 1 0"/>
+  </joint>
+  <joint name="wheel_right_front_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_right_front"/>
+    <origin xyz="0.15 -0.18 -0.05"/><axis xyz="0 1 0"/>
+  </joint>
+  <joint name="wheel_left_middle_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_left_middle"/>
+    <origin xyz="0 0.18 -0.05"/><axis xyz="0 1 0"/>
+  </joint>
+  <joint name="wheel_right_middle_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_right_middle"/>
+    <origin xyz="0 -0.18 -0.05"/><axis xyz="0 1 0"/>
+  </joint>
+  <joint name="wheel_left_rear_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_left_rear"/>
+    <origin xyz="-0.15 0.18 -0.05"/><axis xyz="0 1 0"/>
+  </joint>
+  <joint name="wheel_right_rear_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_right_rear"/>
+    <origin xyz="-0.15 -0.18 -0.05"/><axis xyz="0 1 0"/>
+  </joint>
+</robot>

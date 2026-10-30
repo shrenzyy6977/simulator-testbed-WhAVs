@@ -120,6 +120,19 @@ def report(cfg: dict) -> None:
              "## Success rate (all 4 checkpoints reached)", "", tab.to_markdown(), "",
              "## Checkpoints reached per episode (of 4)", "", cps.to_markdown(), "",
              "## Mean time of successful episodes [s]", "", tmean.to_markdown(), ""]
+    if {"ppo_nominal", "ppo_randomized"} <= set(policies) and len(cfg["seeds"]) > 2:
+        from scipy import stats
+
+        # seeds are the independent units: Welch's t-test on the per-seed success rates
+        rows = []
+        for c in conds:
+            a, b = (per_seed[(per_seed.policy == p) & (per_seed.condition == c)].success.to_numpy()
+                    for p in ("ppo_nominal", "ppo_randomized"))
+            rows.append({"condition": c, "randomised - nominal [points]": round(100 * (b.mean() - a.mean()), 1),
+                         "Welch p": "-" if np.isclose(a.std() + b.std(), 0) else
+                         f"{stats.ttest_ind(b, a, equal_var=False).pvalue:.3f}"})      # both always succeed: no test
+        lines += ["## PPO randomised vs nominal (per-seed success rates, Welch's t-test)", "",
+                  pd.DataFrame(rows).to_markdown(index=False), ""]
     (OUT / "summary.md").write_text("\n".join(lines))
     bars = [{"path": c, "controller": p, "success": 100 * float(agg[(agg.policy == p) & (agg.condition == c)]["mean"].iloc[0])}
             for c in conds for p in policies]

@@ -24,7 +24,7 @@ conditions:
 train:
   ppo_nominal: nominal
   ppo_randomized: randomized
-seeds: [0, 1, 2]
+seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 timesteps: 1000000
 envs: 8
 eval:

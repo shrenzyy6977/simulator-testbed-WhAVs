@@ -133,3 +133,16 @@ def test_go_to_goal_baseline_completes_easy_mission():
         obs, _, term, trunc, info = env.step(policy.predict(obs)[0])
         done = term or trunc
     assert info["success"]
+
+
+def test_second_urdf_robot_loads_and_drives():
+    from terrain3d.world import ROOT, RobotSpec
+
+    spec = RobotSpec(urdf=ROOT / "robots" / "rover6wd.urdf", track=0.36, max_torque=3.0)
+    rob = WheeledRobot(Terrain.uniform("grass", flat(65), 20.0), spec, start=(-6.0, 0.0))
+    assert sorted(rob.sides) == [-1, -1, -1, 1, 1, 1]        # left/right read from "wheel_left_*" names
+    rob.step(250)
+    for _ in range(150):
+        rob.command(0.8, 0.0)
+        rob.step(10)
+    assert abs(rob.body_velocity()[0] - 0.8) < 0.1 and abs(rob.pose()[1]) < 0.1

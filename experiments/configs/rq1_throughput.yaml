@@ -1,0 +1,34 @@
+# RQ1: can the simulator gain ground properties, perception noise and new robot adapters while
+# keeping training throughput practical? Measures RoverNavEnv steps/s as features are added.
+# Regenerate with: python scripts/rq1_throughput.py   (close other heavy programs first)
+steps: 3000                    # env steps per single-process measurement (random actions, resets included)
+repeats: 3                     # report the best of this many runs (least disturbed by the OS)
+base:                          # NavConfig fields of the simplest env
+  terrain: {size: 20.0, n: 65, elevation: {type: flat}}
+  grounds: [grass]
+  tiles: 1
+  gps_noise: 0.0
+  delay_steps: 0
+  max_steps: 300               # episode length of the random policy, so resets are part of the cost
+ladder:                        # cumulative: each level adds its fields to all previous ones
+  - name: flat, one ground
+  - name: + hills (65 x 65 heightfield)
+    terrain: {size: 20.0, n: 65, elevation: {type: hills, amplitude: 0.3, wavelength: 6.0}}
+  - name: + 16 ground-class tiles
+    tiles: 4
+    grounds: [asphalt, grass, gravel, sand, snow, mud]
+  - name: + GPS noise, bias, control delay
+    gps_noise: 0.3
+    gps_bias: 0.3
+    delay_steps: 1
+  - name: + randomisation, new map every episode
+    amplitude_range: [0.0, 0.35]
+    gps_noise_range: [0.0, 0.5]
+    delay_range: [0, 2]
+    new_map_every: 1
+  - name: + 6-wheel rover (second URDF)
+    robot: {urdf: robots/rover6wd.urdf, wheel_radius: 0.065, track: 0.36, max_torque: 3.0}
+reference: + randomisation, new map every episode    # level used for the sweeps below (RQ3 training env)
+resolution: [65, 129, 257]     # heightfield samples per side
+processes: [1, 2, 4, 8]        # SubprocVecEnv workers
+ppo_timesteps: 200000          # PPO (RQ3 settings) trained with the largest process count
