@@ -1,0 +1,29 @@
+# conda env create -f environment.yml && conda activate whavs
+# Core packages are what src/testbed needs; the second pip block is for the 3D / RL work
+# (MuJoCo terrain simulator, PPO baselines) suggested in the progress review.
+name: whavs
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - -e .[dev]
+      - numpy>=1.24
+      - scipy>=1.10
+      - matplotlib>=3.7
+      - pyyaml>=6.0
+      - pandas>=2.0
+      - tabulate>=0.9
+      - pillow>=9.0
+      - pytest>=7.0
+      # 3D simulation and learning
+      - mujoco>=3.2
+      - gymnasium>=1.0
+      - stable-baselines3[extra]>=2.4
+      - torch>=2.4
+      - torchvision>=0.19
+      - tensorboard>=2.17
+      - spatialmath-python>=1.1
+      - jupyterlab>=4.2
+      - ipykernel>=6.29

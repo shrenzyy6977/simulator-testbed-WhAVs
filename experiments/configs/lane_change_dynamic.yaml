@@ -1,0 +1,11 @@
+# Double lane change at 15 m/s on the dynamic bicycle (tyre slip matters here).
+name: lane_change_dynamic
+path: {name: lane_change, v_target: 15.0, a_lat_max: 4.0}
+vehicle: {model: dynamic_bicycle}
+controllers:
+  - {name: pure_pursuit}
+  - {name: stanley}
+  - {name: lqr}
+  - {name: mpc}
+sim: {dt: 0.02}
+settle_time: 0.0

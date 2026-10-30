@@ -1,0 +1,12 @@
+# A* global path through the warehouse map, then path tracking with collision checking.
+name: warehouse_astar
+world: worlds/grid/warehouse.yaml
+path: {astar: {start: [4, 5], goal: [55, 35], clearance: 2.5}, v_target: 5.0}
+vehicle: {model: kinematic_bicycle, params: {length: 3.0, width: 1.5}}
+controllers:
+  - {name: pure_pursuit}
+  - {name: stanley}
+  - {name: lqr}
+  - {name: mpc}
+sim: {dt: 0.02}
+settle_time: 0.0

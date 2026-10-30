@@ -58,6 +58,61 @@ pip install -r requirements.txt
 python tests/run_all.py          # or: pytest -q
 ```
 
+With conda instead (also installs MuJoCo / PyTorch / Stable-Baselines3 for the 3D work):
+
+```bash
+conda env create -f environment.yml && conda activate whavs
+```
+
+### Path-tracking controllers
+
+`src/testbed/control/` has four lateral controllers behind one interface
+(`compute(state, path, dt) -> (steer, accel)`), all sharing the same PI speed controller so a
+comparison isolates the steering law:
+
+| Controller | File | Law |
+|---|---|---|
+| Pure Pursuit | `control/geometric.py` | `delta = atan(2 L sin(alpha) / Ld)`, `Ld = k v + Ld0`, rear axle |
+| Stanley | `control/geometric.py` | `delta = -theta_e - atan(k e / (ks + v))`, front axle |
+| LQR | `control/optimal.py` | DARE on the kinematic lateral-error model + curvature feed-forward |
+| Linear MPC | `control/optimal.py` | 20-step condensed QP with steering bounds, solved by scipy BVLS (no extra solver) |
+
+```bash
+python scripts/run_scenario.py experiments/configs/figure_eight.yaml       # one scenario, all controllers
+python scripts/run_scenario.py experiments/configs/warehouse_astar.yaml    # A* path + collision checking
+python scripts/benchmark.py --model dynamic_bicycle                        # full benchmark
+```
+
+Outputs go to `experiments/results/` (plots, CSV, `summary.md`).
+
+### Benchmark results
+
+Settings in `experiments/configs/benchmark.yaml`: 5 paths x 3 target speeds (5, 10, 15 m/s, capped on
+curves by a lateral acceleration of 4 m/s^2), 1 m initial lateral offset, errors measured after 5 s.
+RMS cross-track error [m] at `v_target` = 15 m/s:
+
+| Path | Model | Pure Pursuit | Stanley | LQR | MPC |
+|---|---|---|---|---|---|
+| s_curve | kinematic bicycle | 0.206 | 0.146 | **0.003** | 0.024 |
+| figure_eight | kinematic bicycle | 0.218 | 0.276 | **0.004** | 0.047 |
+| lane_change | kinematic bicycle | 0.127 | 0.048 | **0.002** | 0.029 |
+| s_curve | dynamic bicycle | 0.233 | 0.187 | **0.128** | 0.163 |
+| figure_eight | dynamic bicycle | 0.311 | 0.169 | **0.167** | 0.192 |
+| lane_change | dynamic bicycle | 0.154 | **0.088** | 0.098 | 0.089 |
+
+Mean controller time per call: Pure Pursuit 0.011 ms, Stanley 0.011 ms, LQR 0.029 ms, MPC 0.18 ms
+(Apple M4, single thread). Full tables: `experiments/results/benchmark_*/summary.md`.
+
+Observations:
+- On the kinematic bicycle, LQR and MPC use the same model as the plant, so they track almost
+  perfectly. Once tyre slip is simulated (dynamic bicycle) the gap shrinks and Stanley becomes
+  best on the lane change: **the ranking changes with the vehicle model**, which is the question
+  raised in our literature review.
+- Stanley's error on the circle (0.16 m on the kinematic model) is geometric: it holds the front
+  axle on the path, while errors are measured at the rear axle, giving `R - sqrt(R^2 - L^2)`.
+- Differential drive gives the same numbers as the kinematic bicycle because its wheel-speed limit
+  is never reached at these speeds.
+
 ## Workflow
 
 - Work on a branch named `feature/<name>-<task>` and open a PR into `main`.

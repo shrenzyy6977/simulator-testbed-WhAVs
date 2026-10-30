@@ -12,3 +12,4 @@ install/
 log/
 experiments/results/*.mp4
 .pytest_cache/
+*.egg-info/

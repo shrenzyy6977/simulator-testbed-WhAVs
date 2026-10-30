@@ -30,7 +30,11 @@ for f in sorted(Path(__file__).parent.glob("test_*.py")):
     for name, fn in inspect.getmembers(mod, inspect.isfunction):
         if not name.startswith("test_"):
             continue
-        cases = [({},)] if not hasattr(fn, "_params") else [({fn._params[0]: v},) for v in fn._params[1]]
+        params = getattr(fn, "_params", None)
+        for mark in getattr(fn, "pytestmark", []):       # real pytest installed
+            if mark.name == "parametrize":
+                params = (mark.args[0], list(mark.args[1]))
+        cases = [({},)] if params is None else [({params[0]: v},) for v in params[1]]
         for (kw,) in cases:
             label = f"{f.stem}::{name}{kw if kw else ''}"
             try:

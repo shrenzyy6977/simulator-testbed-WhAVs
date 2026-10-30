@@ -107,7 +107,15 @@ def lane_change(length=150.0, width=3.5, **kw) -> Path:
     return path_from_points(x, y, name="lane_change", **kw)
 
 
-TEST_PATHS = {"straight": straight, "circle": circle, "s_curve": s_curve, "lane_change": lane_change}
+def figure_eight(size=25.0, **kw) -> Path:
+    """Lemniscate of Gerono, x = a sin t, y = a sin t cos t (one full loop, crosses itself at
+    the origin). Mirrors the figure-eight test path of Liu et al. (RCAR 2021)."""
+    t = np.linspace(0, 2 * np.pi - 1e-3, 800)
+    return path_from_points(size * np.sin(t), size * np.sin(t) * np.cos(t), name="figure_eight", **kw)
+
+
+TEST_PATHS = {"straight": straight, "circle": circle, "s_curve": s_curve, "lane_change": lane_change,
+              "figure_eight": figure_eight}
 
 
 def make_path(name: str, **kw) -> Path:

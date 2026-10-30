@@ -1,0 +1,17 @@
+# Fixed benchmark settings. Changing anything here means regenerating experiments/results/
+# (python scripts/benchmark.py) and updating the results table in README.md.
+paths:
+  - {name: straight}
+  - {name: circle, radius: 20.0}
+  - {name: s_curve}
+  - {name: lane_change}
+  - {name: figure_eight, size: 25.0}
+speeds: [5.0, 10.0, 15.0]          # v_target [m/s]; curves are capped by a_lat_max
+a_lat_max: 4.0
+controllers:
+  - {name: pure_pursuit, k: 0.5, ld_min: 2.0}
+  - {name: stanley, k: 1.0, ks: 1.0}
+  - {name: lqr, q_e: 1.0, q_theta: 1.0, r: 5.0}
+  - {name: mpc, horizon: 20, dt_pred: 0.1}
+sim: {dt: 0.02, init_offset: 1.0}
+settle_time: 5.0
