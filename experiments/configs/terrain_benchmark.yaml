@@ -1,0 +1,22 @@
+# 3D terrain benchmark (MuJoCo): the four path-tracking controllers on the rover URDF,
+# one run per (ground class, path). Changing anything here means regenerating
+# experiments/results/terrain_benchmark/ (python scripts/terrain_benchmark.py).
+robot: robots/rover4wd.urdf
+terrain:
+  size: 20.0
+  n: 129
+  elevation: {type: hills, amplitude: 0.15, wavelength: 6.0, seed: 1}
+grounds: [asphalt, grass, gravel, sand, snow, mud]
+paths:            # rover-scale versions of the 2D test paths, shifted to start at x = -8 m
+  - {name: s_curve, length: 16.0, amplitude: 1.5, wavelength: 8.0, offset: [-8, 0]}
+  - {name: circle, radius: 3.0, offset: [0, -3]}
+  - {name: figure_eight, size: 5.0, offset: [0, 0]}
+v_target: 0.8     # [m/s]
+a_lat_max: 0.5    # [m/s^2]
+controllers:      # gains scaled down from the car-sized 2D benchmark
+  - {name: pure_pursuit, k: 0.3, ld_min: 0.5, ld_max: 2.0}
+  - {name: stanley, k: 1.0, ks: 0.5}
+  - {name: lqr, q_e: 1.0, q_theta: 1.0, r: 5.0}
+  - {name: mpc, horizon: 20, dt_pred: 0.1}
+track: {control_hz: 20.0, virtual_wheelbase: 0.30}
+settle_time: 2.0

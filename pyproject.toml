@@ -14,7 +14,7 @@ dev = ["pytest>=7.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["testbed*"]
+include = ["testbed*", "terrain3d*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
