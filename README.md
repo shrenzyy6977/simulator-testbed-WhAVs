@@ -156,6 +156,34 @@ First results (`experiments/results/terrain_benchmark/summary.md`), s-curve at 0
   episodes on unseen random maps (`experiments/results/ppo/eval.csv`). The current mission is
   clearly too easy (checkpoints 3-6 m apart, gentle hills); harder ERC/URC-style missions are next.
 
+### RQ3: does training in the upgraded simulator make policies more robust?
+
+`python scripts/rq3_robustness.py all` (settings: `experiments/configs/rq3_robustness.yaml`) trains
+PPO in two simulators and evaluates it, together with a classical go-to-goal controller
+(`terrain3d/baselines.py`), on 4-checkpoint missions with a time budget of route length / 0.6 m/s:
+
+- **nominal** training: one flat ground (grass), perfect GPS, no delay, i.e. what a simple simulator offers.
+- **randomised** training: asphalt / grass / gravel / sand patches, hills up to 0.35 m, GPS noise
+  0-0.5 m plus a 0.3 m bias, 0-2 steps of control delay.
+
+Success rate (all 4 checkpoints in time), 50 identical episodes per condition, PPO 1M steps,
+mean ± std over 3 seeds:
+
+| Policy | nominal | randomised | held-out ground (snow, mud) | steep hills (0.55-0.7 m) | high noise (1 m GPS, 3-step delay) |
+|---|---|---|---|---|---|
+| Go-to-goal | 100% | 98% | 26% | 62% | 62% |
+| PPO, nominal training | 100% ± 0 | 100% ± 0 | 18% ± 11 | 71% ± 3 | 61% ± 15 |
+| PPO, randomised training | 100% ± 0 | 100% ± 0 | **28% ± 5** | **73% ± 2** | **73% ± 10** |
+
+- Randomised training helps most where the test differs from the training simulator in ways it
+  randomised: high noise (73% vs 61%) and unseen grounds (28% vs 18%). On steep hills both PPO
+  variants are equal (73% vs 71%), so terrain randomisation up to 0.35 m did not buy extra hill skill.
+- The evidence is still weak: with episodes pooled over seeds, Fisher's exact test gives p = 0.03
+  (high noise) and p = 0.05 (held-out ground), but the seed-to-seed spread is as large as the gap.
+  More seeds (5-10) are needed before claiming an effect.
+- Snow and mud stay hard for everyone (18-28%): in our ground model those surfaces have low
+  traction and high rolling resistance, so steep climbs often cannot be done within the time budget.
+
 Known limitations (to fix or calibrate next):
 - Skid-steer turning: with MuJoCo's contact model the rover reaches only part of the commanded yaw
   rate, worst on high-friction ground (asphalt), which is why every controller does badly there. Needs

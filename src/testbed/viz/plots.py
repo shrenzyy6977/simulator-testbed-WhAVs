@@ -18,8 +18,12 @@ CONTROLLER_COLORS = {
     "stanley": "#eb6834",
     "lqr": "#1baf7a",
     "mpc": "#eda100",
+    "go_to_goal": "#e87ba4",       # navigation policies (terrain3d) continue the fixed slot order
+    "ppo_nominal": "#008300",
+    "ppo_randomized": "#6250d6",
 }
-CONTROLLER_LABELS = {"pure_pursuit": "Pure Pursuit", "stanley": "Stanley", "lqr": "LQR", "mpc": "MPC"}
+CONTROLLER_LABELS = {"pure_pursuit": "Pure Pursuit", "stanley": "Stanley", "lqr": "LQR", "mpc": "MPC",
+                     "go_to_goal": "Go-to-goal", "ppo_nominal": "PPO (nominal)", "ppo_randomized": "PPO (randomised)"}
 REFERENCE_COLOR = "#8a8984"
 TEXT = "#52514e"
 GRID = "#e4e3df"

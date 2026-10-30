@@ -101,3 +101,35 @@ def test_nav_env_api_and_determinism():
     o1, _ = env.reset(seed=3)
     o2, _ = RoverNavEnv().reset(seed=3)
     assert o1.shape == (11,) and np.allclose(o1, o2)
+
+
+def test_nav_env_randomisation_and_time_budget():
+    from terrain3d.env import NavConfig
+
+    cfg = NavConfig(grounds=["sand"], amplitude_range=(0.0, 0.0), gps_noise_range=(0.2, 0.4), gps_bias=0.5,
+                    delay_range=(0, 2), min_avg_speed=0.5)
+    env = RoverNavEnv(cfg)
+    stds, delays = set(), set()
+    for s in range(8):
+        env.reset(seed=s)
+        stds.add(round(env.gps_std, 3))
+        delays.add(env.delay)
+        assert np.ptp(env.terrain.elevation) == 0.0 and env.robot.ground().name == "sand"
+        assert all(0.2 <= v <= 0.4 for v in stds) and delays <= {0, 1, 2}
+        route = np.r_[[env.robot.pose()[:2]], env.checkpoints]
+        assert env.max_steps == int(np.ceil(np.sum(np.hypot(*np.diff(route, axis=0).T)) / 0.5 * cfg.control_hz))
+    assert len(stds) > 1
+
+
+def test_go_to_goal_baseline_completes_easy_mission():
+    from terrain3d.baselines import GoToGoal
+    from terrain3d.env import NavConfig
+
+    env = RoverNavEnv(NavConfig(grounds=["grass"], amplitude_range=(0.0, 0.0), gps_noise=0.0, delay_steps=0))
+    policy = GoToGoal()
+    obs, _ = env.reset(seed=7)
+    done = False
+    while not done:
+        obs, _, term, trunc, info = env.step(policy.predict(obs)[0])
+        done = term or trunc
+    assert info["success"]

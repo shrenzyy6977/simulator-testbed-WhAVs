@@ -9,6 +9,10 @@ fixed control rate and with a configurable control delay.
             sin/cos of the bearing error, forward speed (m/s), yaw rate (rad/s),
             roll, pitch (rad), previous action (2)                                  -> 11 values
     reward  10 * (d_prev - d)  - 0.01 per step  + 10 per checkpoint  - 10 if flipped / out of map
+
+Domain randomisation (NavConfig *_range fields) samples hill height per map and GPS noise and
+control delay per episode; `gps_bias` adds a constant per-episode GPS offset, and `min_avg_speed`
+sets a time budget proportional to the route length, as in timed competition missions.
 """
 from __future__ import annotations
 
@@ -35,8 +39,14 @@ class NavConfig:
     omega_max: float = 2.0            # [rad/s]
     control_hz: float = 10.0
     delay_steps: int = 1              # control delay in control periods
-    gps_noise: float = 0.3            # [m]
+    gps_noise: float = 0.3            # [m] white noise per fix
+    gps_bias: float = 0.0             # [m] std of a constant per-episode offset (multipath, bad fix)
     max_steps: int = 600
+    min_avg_speed: float | None = None      # [m/s] if set, the time budget is route length / this speed
+    # Domain randomisation: when set, sampled uniformly per map / per episode and override the above.
+    amplitude_range: tuple | None = None    # hill amplitude [m]; < 0.01 gives a flat map
+    gps_noise_range: tuple | None = None
+    delay_range: tuple | None = None        # inclusive integer range of control-delay steps
     new_map_every: int = 10           # episodes between rebuilding the map (compiling costs ~ms)
     robot: RobotSpec = field(default_factory=RobotSpec)
 
@@ -58,9 +68,12 @@ class RoverNavEnv(gym.Env):
         c = self.cfg
         tc = dict(c.terrain)
         tc["elevation"] = {**tc.get("elevation", {}), "seed": int(self.np_random.integers(1 << 30))}
+        if c.amplitude_range is not None:
+            amp = float(self.np_random.uniform(*c.amplitude_range))
+            tc["elevation"] = {**tc["elevation"], "type": "hills" if amp >= 0.01 else "flat", "amplitude": amp}
         tc["ground"] = {"patches": c.grounds, "tiles": c.tiles, "seed": int(self.np_random.integers(1 << 30))}
         if tc["elevation"]["type"] == "flat":
-            tc["elevation"].pop("seed")
+            tc["elevation"] = {"type": "flat"}
         self.terrain: Terrain = make_terrain(tc)
         self.robot = WheeledRobot(self.terrain, c.robot, start=(0.0, 0.0))
 
@@ -88,7 +101,7 @@ class RoverNavEnv(gym.Env):
 
     def _gps(self) -> np.ndarray:
         x, y, *_ = self.robot.pose()
-        return np.array([x, y]) + self.np_random.normal(0, self.cfg.gps_noise, 2)
+        return np.array([x, y]) + self.gps_offset + self.np_random.normal(0, self.gps_std, 2)
 
     def _obs(self) -> np.ndarray:
         rob = self.robot
@@ -113,8 +126,18 @@ class RoverNavEnv(gym.Env):
         self._episodes += 1
         self._place()
         self.target, self.steps = 0, 0
+        self.max_steps = self.cfg.max_steps
+        if self.cfg.min_avg_speed:
+            x, y, *_ = self.robot.pose()
+            route = np.r_[[[x, y]], self.checkpoints]
+            length = float(np.sum(np.hypot(*np.diff(route, axis=0).T)))
+            self.max_steps = int(np.ceil(length / self.cfg.min_avg_speed * self.cfg.control_hz))
         self.last_action = np.zeros(2)
-        self.queue = [np.zeros(2)] * self.cfg.delay_steps
+        c = self.cfg
+        self.gps_std = float(self.np_random.uniform(*c.gps_noise_range)) if c.gps_noise_range else c.gps_noise
+        self.gps_offset = self.np_random.normal(0, c.gps_bias, 2) if c.gps_bias > 0 else np.zeros(2)
+        self.delay = int(self.np_random.integers(c.delay_range[0], c.delay_range[1] + 1)) if c.delay_range else c.delay_steps
+        self.queue = [np.zeros(2)] * self.delay
         self.prev_dist = self._true_dist()
         return self._obs(), {"ground": self.robot.ground().name}
 
@@ -143,7 +166,7 @@ class RoverNavEnv(gym.Env):
         if failed:
             reward -= 10.0
             terminated = True
-        truncated = self.steps >= c.max_steps
+        truncated = self.steps >= self.max_steps
         info = {"ground": rob.ground().name, "checkpoints_reached": self.target + int(terminated and not failed),
                 "slip": rob.slip_ratio(), "success": bool(terminated and not failed)}
         return self._obs(), float(reward), terminated, truncated, info
