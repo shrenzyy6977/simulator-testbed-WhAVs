@@ -207,4 +207,6 @@ comparison (URBAN-SIM renders RGB-D, we render nothing during training).
   Earth Rover's 1 Hz GPS, both PPO policies beat a classical go-to-goal controller under heavy noise
   (49–55% vs 36%), but randomised training gives no significant extra robustness (+5.2 points on
   noise, p = 0.11; −4.6 on unseen ground). With a fresh fix every step it had been significant
-  (+8.8 points, p = 0.019), so the GPS model alone changes the conclusion.
+  (+8.8 points, p = 0.019), so the GPS model alone changes the conclusion. RQ2 shows the same at the
+  level of rankings: single upgrades barely reorder seven policies (Kendall's tau 0.71–1.00), but all
+  upgrades together do (tau 0.52), and the best classical controller changes from Stanley to go-to-goal.

@@ -135,6 +135,23 @@ def test_go_to_goal_baseline_completes_easy_mission():
     assert info["success"]
 
 
+@pytest.mark.parametrize("name", ["pure_pursuit", "stanley", "lqr", "mpc"])
+def test_path_trackers_fly_checkpoint_mission(name):
+    from terrain3d.baselines import PathTracker
+    from terrain3d.env import NavConfig
+
+    cfg = NavConfig(grounds=["grass"], amplitude_range=(0.0, 0.0), gps_noise=0.0, delay_steps=0, n_checkpoints=4,
+                    checkpoint_spacing=(4.0, 8.0), checkpoint_radius=0.75, min_avg_speed=0.6, max_steps=900)
+    env = RoverNavEnv(cfg)
+    obs, _ = env.reset(seed=100_012)          # starts facing ~156 deg away from the first leg
+    policy = PathTracker(make_controller(name)).reset(env)
+    done = False
+    while not done:
+        obs, _, term, trunc, info = env.step(policy.predict(obs)[0])
+        done = term or trunc
+    assert info["success"]
+
+
 def test_second_urdf_robot_loads_and_drives():
     from terrain3d.world import ROOT, RobotSpec
 

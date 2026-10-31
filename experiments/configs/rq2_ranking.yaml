@@ -1,0 +1,42 @@
+# RQ2: does evaluating under the simulator upgrades change which navigation policies rank best?
+# Every policy flies the same checkpoint missions in a simple simulator, with each upgrade on its
+# own, and with all upgrades together; the rankings are compared with Kendall's tau.
+# Regenerate with: python scripts/rq2_ranking.py   (uses the RQ3 policies: python scripts/rq3_robustness.py train)
+mission:                       # the RQ3 missions (NavConfig fields)
+  terrain: {size: 20.0, n: 65, elevation: {type: hills, amplitude: 0.0, wavelength: 6.0}}
+  tiles: 4
+  n_checkpoints: 4
+  checkpoint_spacing: [4.0, 8.0]
+  checkpoint_radius: 0.75
+  max_steps: 900
+  min_avg_speed: 0.6           # [m/s] time budget = route length / 0.6 m/s (v_max is 1.0 m/s)
+simple:                        # what a simple simulator offers: flat, one ground, perfect GPS every step, no delay
+  {grounds: [grass], amplitude_range: [0.0, 0.0], gps_noise: 0.0, gps_hz: 10.0, delay_steps: 0}
+levels:                        # each level is `simple` plus these fields
+  simple: {}
+  hills: {amplitude_range: [0.2, 0.4]}
+  ground_classes: {grounds: [asphalt, grass, gravel, sand, snow, mud]}
+  gps_noise: {gps_noise: 0.5, gps_bias: 0.3}
+  gps_1hz: {gps_hz: 1.0}
+  control_delay: {delay_steps: 2}
+  rover6wd: {robot: {urdf: robots/rover6wd.urdf, wheel_radius: 0.065, track: 0.36, max_torque: 3.0}}
+  all_upgrades:                # the upgraded simulator (Earth Rover-like sensing) with the 4-wheel rover
+    {amplitude_range: [0.2, 0.4], grounds: [asphalt, grass, gravel, sand, snow, mud],
+     gps_noise: 0.5, gps_bias: 0.3, gps_hz: 1.0, delay_steps: 2}
+  simple_retest: {episode_seed: 200000}   # control: the simple simulator on 50 other missions; its tau is
+                                          # what re-testing alone gives, so an upgrade must fall below it
+reference: simple
+policies:                      # classical: controller gains from terrain_benchmark.yaml; PPO: the RQ3 models
+  go_to_goal: {}
+  pure_pursuit: {k: 0.3, ld_min: 0.5, ld_max: 2.0}
+  stanley: {k: 1.0, ks: 0.5}
+  lqr: {q_e: 1.0, q_theta: 1.0, r: 5.0}
+  mpc: {horizon: 20, dt_pred: 0.1}
+  ppo_nominal: rq3
+  ppo_randomized: rq3
+tracker: {v_target: 1.0, a_lat_max: 1.0}   # PathTracker settings shared by the four path trackers
+models: experiments/results/rq3/models
+seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]      # PPO training seeds
+episodes: 50                   # per (policy, seed, level); every policy sees the same missions
+bootstrap: 2000
+workers: 8

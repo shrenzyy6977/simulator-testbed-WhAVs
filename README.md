@@ -129,7 +129,7 @@ package because it needs MuJoCo; `src/testbed` stays plain numpy/scipy.
 | Terrain | `terrain3d/terrain.py` | Elevation grid (flat, hills, slope, or a `.npy` / PNG elevation map) cut into tiles; each tile is a heightfield with its own ground class |
 | Ground classes | `terrain3d/terrain.py` | asphalt, grass, gravel, sand, snow, mud: sliding / torsional / rolling friction and contact softness (sinkage proxy). Values are placeholders to calibrate |
 | Robot | `robots/rover4wd.urdf`, `robots/rover6wd.urdf`, `terrain3d/world.py` | Any URDF with joints named `wheel_*` is loaded with MjSpec, gets a free base and velocity-controlled wheel motors (skid steering) |
-| Classical baselines | `terrain3d/tracking.py` | The four controllers from `src/testbed` drive the robot unchanged (steering output -> yaw-rate command) |
+| Classical baselines | `terrain3d/tracking.py`, `terrain3d/baselines.py` | The four controllers from `src/testbed` drive the robot unchanged (steering output -> yaw-rate command), along a given path or, through `PathTracker`, leg by leg through a checkpoint mission from the GPS fix; `GoToGoal` steers at the next checkpoint |
 | RL interface | `terrain3d/env.py` | `RoverNavEnv`: reach GNSS checkpoints with noisy GPS (0.3 m) at 1 Hz like the Earth Rover (the observation includes the age of the fix), 10 Hz control, 1-step control delay; random map and ground patches per episode |
 
 ```bash
@@ -158,6 +158,73 @@ First results (`experiments/results/terrain_benchmark/summary.md`), s-curve at 0
 - PPO baseline: 500k steps (under 3 min, 8 processes) reach all 3 checkpoints in 49/50 evaluation
   episodes on unseen random maps with 1 Hz GPS (`experiments/results/ppo/eval.csv`). The current mission is
   clearly too easy (checkpoints 3-6 m apart, gentle hills); harder ERC/URC-style missions are next.
+
+### RQ2: does evaluating in the upgraded simulator change which policies rank best?
+
+`python scripts/rq2_ranking.py` (settings: `experiments/configs/rq2_ranking.yaml`) flies seven
+policies through the same 50 RQ3 checkpoint missions in a simple simulator (flat, grass, perfect GPS
+every step, no delay), with each upgrade on its own, and with all upgrades together:
+
+- **Policies:** go-to-goal; Pure Pursuit, Stanley, LQR and MPC; PPO trained nominally and with
+  randomisation (the RQ3 models, averaged over 10 seeds).
+  - The four path trackers keep their terrain-benchmark gains. `PathTracker` flies them leg by leg
+    from the GPS fix, turns on the spot when facing away from the leg, and replans after every
+    checkpoint.
+  - Each of the seven succeeds on 100% of the simple-simulator missions.
+- **Score:** SCT, success weighted by completion time (Yokoyama et al., 2021): 0 for a failure,
+  1 for a success at top speed on the straight route.
+- **Agreement:** rankings are compared with Kendall's tau, with 95% intervals from 2,000 paired
+  bootstrap resamples of missions and seeds.
+- **Control:** the simple simulator again, on 50 different missions. Its tau shows how much the
+  ranking moves from re-testing alone.
+
+| Simulator | Kendall's tau vs simple | Best policy | Same best as simple |
+|---|---|---|---|
+| + hills (0.2-0.4 m) | 1.00 [0.81, 1.00] | PPO, nominal | 91% |
+| + 6 ground classes | 0.90 [0.81, 1.00] | PPO, nominal | 80% |
+| + GPS noise 0.5 m, bias 0.3 m | 0.81 [0.62, 0.90] | PPO, nominal | 72% |
+| + 1 Hz GPS | 0.90 [0.62, 0.90] | PPO, nominal | 79% |
+| + 2-step control delay | 0.71 [0.62, 0.90] | PPO, randomised | 48% |
+| 6-wheel rover | 1.00 [0.52, 1.00] | PPO, nominal | 86% |
+| **all upgrades** (hills, 6 grounds, noisy 1 Hz GPS, delay) | **0.52 [0.24, 0.62]** | **PPO, randomised** | **25%** |
+| simple, new missions (control) | 1.00 [0.81, 1.00] | PPO, nominal | 82% |
+
+Rank by SCT (success rate):
+
+| Policy | simple | all upgrades |
+|---|---|---|
+| PPO, nominal training | 1 (100%) | 2 (73%) |
+| PPO, randomised training | 2 (100%) | **1 (78%)** |
+| Stanley | 3 (100%) | 4 (60%) |
+| LQR | 4 (100%) | 5 (56%) |
+| MPC | 5 (100%) | 6 (54%) |
+| Pure Pursuit | 6 (100%) | 7 (34%) |
+| Go-to-goal | 7 (100%) | **3 (72%)** |
+
+- **Single upgrades barely reorder the policies.**
+  - Hills, ground classes and the second robot stay within the re-test band.
+  - GPS noise, the 1 Hz rate and control delay move the ranking a little. Control delay moves it
+    most: tau falls below the control's in 97% of resamples, and randomised PPO moves to first.
+- **All upgrades together change the ranking.**
+  - Tau drops to 0.52, below the control in every resample.
+  - Go-to-goal moves from last to third. It beats Stanley and LQR in 97% and 98% of resamples,
+    while in the simple simulator Stanley beats it in all of them.
+  - Pure Pursuit falls to 34% success.
+  - A likely reason: the path trackers steer on a cross-track error computed from a noisy, stale
+    GPS fix, while go-to-goal only needs the bearing to the checkpoint.
+- **The simple simulator barely separates the policies.**
+  - All succeed, and scores span only 0.08 (0.88-0.96). With all upgrades they span 0.36.
+  - A team choosing a classical controller in the simple simulator would pick Stanley; the upgraded
+    simulator says go-to-goal.
+- **PPO is on top in both.** Randomised training overtakes nominal training with all upgrades in
+  89% of resamples, which is suggestive but not conclusive (RQ3 agrees).
+- **Answer to RQ2:** yes, but through the combination of upgrades, not through any single one.
+  Evaluating only in a simple simulator would pick the wrong classical controller.
+- **Caveats:**
+  - PPO (nominal) was trained in the simple simulator, so it has a home advantage there.
+  - The trackers' adapter (straight legs, rotate on the spot) is one reasonable design among several.
+
+![RQ2 ranking](experiments/results/rq2/ranking.png)
 
 ### RQ3: does training in the upgraded simulator make policies more robust?
 
