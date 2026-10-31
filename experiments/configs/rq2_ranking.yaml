@@ -23,6 +23,14 @@ levels:                        # each level is `simple` plus these fields
   all_upgrades:                # the upgraded simulator (Earth Rover-like sensing) with the 4-wheel rover
     {amplitude_range: [0.2, 0.4], grounds: [asphalt, grass, gravel, sand, snow, mud],
      gps_noise: 0.5, gps_bias: 0.3, gps_hz: 1.0, delay_steps: 2}
+  real_terrain:                # real ground shape: 20 m swissALTI3D patches (python scripts/fetch_dem.py)
+    {terrain: {size: 20.0, n: 65, elevation: {type: dem, path: experiments/maps/swissalti3d_bern.npz}},
+     amplitude_range: null}
+  earthrover_mini_plus: {robot: {urdf: robots/earthrover_mini_plus.urdf, wheel_radius: 0.0475, track: 0.14, max_wheel_speed: 30.0}}
+  erc_like:                    # the Earth Rover Mini+ on real suburban terrain with its own sensing
+    {terrain: {size: 20.0, n: 65, elevation: {type: dem, path: experiments/maps/swissalti3d_bern.npz}},
+     amplitude_range: null, grounds: [asphalt, grass, gravel], gps_noise: 0.5, gps_bias: 0.3, gps_hz: 1.0, delay_steps: 2,
+     robot: {urdf: robots/earthrover_mini_plus.urdf, wheel_radius: 0.0475, track: 0.14, max_wheel_speed: 30.0}}
   simple_retest: {episode_seed: 200000}   # control: the simple simulator on 50 other missions; its tau is
                                           # what re-testing alone gives, so an upgrade must fall below it
 reference: simple

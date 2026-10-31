@@ -126,9 +126,9 @@ package because it needs MuJoCo; `src/testbed` stays plain numpy/scipy.
 
 | Piece | File | What it does |
 |---|---|---|
-| Terrain | `terrain3d/terrain.py` | Elevation grid (flat, hills, slope, or a `.npy` / PNG elevation map) cut into tiles; each tile is a heightfield with its own ground class |
+| Terrain | `terrain3d/terrain.py` | Elevation grid (flat, hills, slope, a `.npy` / PNG elevation map, or real 20 m patches of swisstopo's 0.5 m swissALTI3D model) cut into tiles; each tile is a heightfield with its own ground class |
 | Ground classes | `terrain3d/terrain.py` | asphalt, grass, gravel, sand, snow, mud: sliding / torsional / rolling friction and contact softness (sinkage proxy). Values are placeholders to calibrate |
-| Robot | `robots/rover4wd.urdf`, `robots/rover6wd.urdf`, `terrain3d/world.py` | Any URDF with joints named `wheel_*` is loaded with MjSpec, gets a free base and velocity-controlled wheel motors (skid steering) |
+| Robot | `robots/rover4wd.urdf`, `robots/rover6wd.urdf`, `robots/earthrover_mini_plus.urdf`, `terrain3d/world.py` | Any URDF with joints named `wheel_*` is loaded with MjSpec, gets a free base and velocity-controlled wheel motors (skid steering) |
 | Classical baselines | `terrain3d/tracking.py`, `terrain3d/baselines.py` | The four controllers from `src/testbed` drive the robot unchanged (steering output -> yaw-rate command), along a given path or, through `PathTracker`, leg by leg through a checkpoint mission from the GPS fix; `GoToGoal` steers at the next checkpoint |
 | RL interface | `terrain3d/env.py` | `RoverNavEnv`: reach GNSS checkpoints with noisy GPS (0.3 m) at 1 Hz like the Earth Rover (the observation includes the age of the fix), 10 Hz control, 1-step control delay; random map and ground patches per episode |
 
@@ -136,6 +136,8 @@ package because it needs MuJoCo; `src/testbed` stays plain numpy/scipy.
 python scripts/terrain_benchmark.py          # 4 controllers x 6 ground classes x 3 paths
 python scripts/terrain_demo.py               # mixed-terrain figure + 3D render
 python scripts/train_ppo.py --timesteps 500000 --envs 8
+python scripts/fetch_dem.py                  # real terrain patches (downloads one 20.8 MB swisstopo tile once)
+python scripts/earthrover_demo.py            # Earth Rover Mini+ mission on real terrain: map.png, render.png
 ```
 
 First results (`experiments/results/terrain_benchmark/summary.md`), s-curve at 0.8 m/s over
@@ -159,11 +161,58 @@ First results (`experiments/results/terrain_benchmark/summary.md`), s-curve at 0
   episodes on unseen random maps with 1 Hz GPS (`experiments/results/ppo/eval.csv`). The current mission is
   clearly too easy (checkpoints 3-6 m apart, gentle hills); harder ERC/URC-style missions are next.
 
+### Earth Rover Mini+ on real terrain
+
+`robots/earthrover_mini_plus.urdf` models the FrodoBots EarthRover Mini+, the Earth Rover
+Challenge robot, as a rigid 4-wheel skid-steer:
+
+| Quantity | Value | Source |
+|---|---|---|
+| Size (L x W x H) | 250 x 190 x 195 mm | [FrodoBots help centre](https://intercom.help/frodobots/en/articles/11774641-what-is-an-earthrover-types-of-bots-and-use-cases) |
+| Mass | 1.4 kg (main body) | FrodoBots help centre |
+| Ground clearance | 45 mm | FrodoBots help centre |
+| Top speed | 4 km/h (software-capped) | FrodoBots help centre |
+| Drive | 4 wheels (the SDK logs 4 wheel RPMs), two brushless motors, turns on the spot | [shop page](https://shop.frodobots.com/products/miniplus), [LeRobot docs](https://huggingface.co/docs/lerobot/en/earthrover_mini_plus) |
+| Tyres | ~95 mm diameter, ~50 mm wide | measured on the side and front product photos, scaled by the published size |
+| Wheelbase, track | ~155 mm, ~140 mm | same; 155 + 95 = 250 mm and 140 + 50 = 190 mm match the published size |
+
+- **Simplifications:** the coil-spring suspension is rigid, the body is two boxes and a camera post,
+  and the mass split (1.0 kg body, 4 x 0.1 kg wheels) is a guess.
+- **Driving:** the model sits at the published 45 mm clearance and reaches the commanded 1 m/s on
+  firm ground (0.7 m/s on sand, 0.5 m/s on mud). It climbs 20° grass slopes and stalls near 25°.
+- **Known limitation, turning:** turning on the spot reaches only 0.2-0.4 rad/s of a commanded
+  2 rad/s.
+  - The wheelbase is longer than the track, so with MuJoCo's hard Coulomb contacts the wheels'
+    drive force barely overcomes the sideways scrubbing.
+  - More motor torque does not help, and a stiffer wheel-speed loop makes it worse.
+  - The real robot turns on the spot on soft knobbly tyres. Calibrating this against FrodoBots
+    logs is the next fix; until then the Earth Rover's mission results are pessimistic.
+
+Real terrain: `scripts/fetch_dem.py` (settings: `experiments/configs/dem_swissalti3d.yaml`) downloads one
+1 km tile of swissALTI3D (swisstopo's 0.5 m bare-earth elevation model, free open data) south of Bern.
+- It cuts 40 non-overlapping 20 m patches, each with a 95th-percentile slope of at most 20° and at
+  least 0.3 m of relief: 5-20° slopes and 0.9-7.6 m of relief in total.
+- They are stored in `experiments/maps/swissalti3d_bern.npz` (458 kB).
+- `elevation: {type: dem, path: ...}` gives the env a random patch in a random 90° orientation per map.
+- Elevation data: swissALTI3D (c) swisstopo.
+
+![Real terrain patches](experiments/results/dem/patches.png)
+
+`python scripts/earthrover_demo.py --policy experiments/results/rq3/models/ppo_randomized_s0.zip`
+flies one ERC-like mission. It uses the Earth Rover on a real patch with noisy, biased 1 Hz GPS and a
+2-step control delay; this example mission (seed 4) succeeds:
+
+![Earth Rover mission on real terrain](experiments/results/dem/map.png)
+
+![Earth Rover Mini+ in MuJoCo](experiments/results/dem/render.png)
+
 ### RQ2: does evaluating in the upgraded simulator change which policies rank best?
 
 `python scripts/rq2_ranking.py` (settings: `experiments/configs/rq2_ranking.yaml`) flies seven
 policies through the same 50 RQ3 checkpoint missions in a simple simulator (flat, grass, perfect GPS
-every step, no delay), with each upgrade on its own, and with all upgrades together:
+every step, no delay), with each upgrade on its own, with all upgrades together, on real terrain, on
+the Earth Rover Mini+, and in an ERC-like setting that combines the last two with the Earth Rover's
+sensing:
 
 - **Policies:** go-to-goal; Pure Pursuit, Stanley, LQR and MPC; PPO trained nominally and with
   randomisation (the RQ3 models, averaged over 10 seeds).
@@ -187,19 +236,22 @@ every step, no delay), with each upgrade on its own, and with all upgrades toget
 | + 2-step control delay | 0.71 [0.62, 0.90] | PPO, randomised | 48% |
 | 6-wheel rover | 1.00 [0.52, 1.00] | PPO, nominal | 86% |
 | **all upgrades** (hills, 6 grounds, noisy 1 Hz GPS, delay) | **0.52 [0.24, 0.62]** | **PPO, randomised** | **25%** |
+| real terrain (swissALTI3D patches) | 0.90 [0.62, 1.00] | PPO, nominal | 84% |
+| Earth Rover Mini+ (flat, perfect GPS) | 0.71 [0.33, 0.90] | PPO, nominal | 79% |
+| **ERC-like** (Earth Rover Mini+, real terrain, asphalt / grass / gravel, noisy 1 Hz GPS, delay) | **0.62 [0.52, 0.98]** | PPO, nominal | 60% |
 | simple, new missions (control) | 1.00 [0.81, 1.00] | PPO, nominal | 82% |
 
 Rank by SCT (success rate):
 
-| Policy | simple | all upgrades |
-|---|---|---|
-| PPO, nominal training | 1 (100%) | 2 (73%) |
-| PPO, randomised training | 2 (100%) | **1 (78%)** |
-| Stanley | 3 (100%) | 4 (60%) |
-| LQR | 4 (100%) | 5 (56%) |
-| MPC | 5 (100%) | 6 (54%) |
-| Pure Pursuit | 6 (100%) | 7 (34%) |
-| Go-to-goal | 7 (100%) | **3 (72%)** |
+| Policy | simple | all upgrades | ERC-like |
+|---|---|---|---|
+| PPO, nominal training | 1 (100%) | 2 (73%) | 1 (33%) |
+| PPO, randomised training | 2 (100%) | **1 (78%)** | 2 (33%) |
+| Stanley | 3 (100%) | 4 (60%) | 5 (10%) |
+| LQR | 4 (100%) | 5 (56%) | 4 (10%) |
+| MPC | 5 (100%) | 6 (54%) | 3 (10%) |
+| Pure Pursuit | 6 (100%) | 7 (34%) | 7 (0%) |
+| Go-to-goal | 7 (100%) | **3 (72%)** | 6 (2%) |
 
 - **Single upgrades barely reorder the policies.**
   - Hills, ground classes and the second robot stay within the re-test band.
@@ -212,17 +264,31 @@ Rank by SCT (success rate):
   - Pure Pursuit falls to 34% success.
   - A likely reason: the path trackers steer on a cross-track error computed from a noisy, stale
     GPS fix, while go-to-goal only needs the bearing to the checkpoint.
+- **Real terrain alone does not reorder them; the Earth Rover does.**
+  - On the real swissALTI3D patches every policy still succeeds 96-98% of the time, and tau stays
+    within the re-test band.
+  - Swapping in the Earth Rover Mini+ model drops success to 38-82%. Tau falls below the control's in
+    95% of resamples.
+  - In the ERC-like setting the classical controllers nearly all fail (0-10%), while PPO reaches 33%
+    and beats each of them in every resample. Most failures are timeouts: the Earth Rover model turns
+    slowly (see its section above), so these numbers depend on that uncalibrated turning.
+  - Go-to-goal, third with all upgrades on the 4-wheel rover, is sixth in the ERC-like setting. The
+    best classical controller depends on the robot as well as on the sensing.
 - **The simple simulator barely separates the policies.**
   - All succeed, and scores span only 0.08 (0.88-0.96). With all upgrades they span 0.36.
-  - A team choosing a classical controller in the simple simulator would pick Stanley; the upgraded
-    simulator says go-to-goal.
+  - A team choosing a classical controller in the simple simulator would pick Stanley; with all
+    upgrades on the 4-wheel rover the answer is go-to-goal, and on the Earth Rover none of them work
+    well.
 - **PPO is on top in both.** Randomised training overtakes nominal training with all upgrades in
   89% of resamples, which is suggestive but not conclusive (RQ3 agrees).
-- **Answer to RQ2:** yes, but through the combination of upgrades, not through any single one.
-  Evaluating only in a simple simulator would pick the wrong classical controller.
+- **Answer to RQ2:** yes, but through the combination of upgrades and the robot model, not through
+  any single sensing or terrain upgrade. Evaluating only in a simple simulator would pick the wrong
+  classical controller.
 - **Caveats:**
   - PPO (nominal) was trained in the simple simulator, so it has a home advantage there.
   - The trackers' adapter (straight legs, rotate on the spot) is one reasonable design among several.
+  - The PPO policies were trained on the 4-wheel rover; on the Earth Rover they are tested on an
+    unseen robot.
 
 ![RQ2 ranking](experiments/results/rq2/ranking.png)
 
@@ -297,9 +363,15 @@ Known limitations (to fix or calibrate next):
 - Skid-steer turning: with MuJoCo's contact model the rover reaches only part of the commanded yaw
   rate, worst on high-friction ground (asphalt), which is why every controller does badly there. Needs
   calibration against real data (e.g. FrodoBots logs) before drawing conclusions about asphalt.
+  The Earth Rover Mini+ model is hit hardest (0.2-0.4 rad/s of a commanded 2 rad/s), since its
+  wheelbase is longer than its track.
 - Ground parameters are plausible placeholders, not measured values; sinkage is approximated by soft
   contacts, there is no deformable soil.
-- The rover URDF is a generic small 4WD skid-steer, not the real Earth Rover Mini+ geometry.
+- The Earth Rover Mini+ URDF follows the published size, mass and clearance, but tyre size, wheel
+  spacing and mass split are estimated from photos, and its suspension is rigid. `rover4wd.urdf` and
+  `rover6wd.urdf` stay generic.
+- Real terrain comes from one 1 km tile near Bern; the ground classes on it are still assigned at
+  random, not mapped from land cover.
 
 ## Workflow
 

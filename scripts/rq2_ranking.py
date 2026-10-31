@@ -36,6 +36,8 @@ CONFIG = ROOT / "experiments" / "configs" / "rq2_ranking.yaml"
 LEVEL_LABELS = {"simple": "simple", "hills": "+ hills", "ground_classes": "+ 6 ground classes",
                 "gps_noise": "+ GPS noise, bias", "gps_1hz": "+ 1 Hz GPS", "control_delay": "+ control delay",
                 "rover6wd": "6-wheel rover", "all_upgrades": "all upgrades",
+                "real_terrain": "real terrain", "earthrover_mini_plus": "Earth Rover Mini+",
+                "erc_like": "ERC-like",
                 "simple_retest": "simple, new missions (control)"}
 
 
@@ -111,7 +113,7 @@ def plot(policies: list, levels: list, rk: np.ndarray, boot_tau: np.ndarray, poi
 
     from testbed.viz.plots import CONTROLLER_COLORS, GRID, REFERENCE_COLOR, TEXT, _style, label
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.8), gridspec_kw={"width_ratios": [1.7, 1]})
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.4), gridspec_kw={"width_ratios": [1.7, 1]})
     sims = [j for j in range(len(levels)) if j != control]          # the control is not a simulator
     x = np.arange(len(sims))
     for i, p in enumerate(policies):
@@ -124,7 +126,7 @@ def plot(policies: list, levels: list, rk: np.ndarray, boot_tau: np.ndarray, poi
     ax1.set_xlim(-0.3, x[-1] + 1.6)
     ax1.set_ylabel("rank by SCT (1 = best)")
     ax1.set_title("Rank of each policy in each simulator", fontsize=10, color=TEXT, loc="left")
-    ax1.legend(loc="upper center", bbox_to_anchor=(0.45, -0.32), ncol=4, frameon=False, fontsize=9)
+    ax1.legend(loc="upper center", bbox_to_anchor=(0.45, -0.36), ncol=4, frameon=False, fontsize=9)
     _style(ax1)
     ax1.grid(False, axis="x")
 

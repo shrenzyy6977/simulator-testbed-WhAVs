@@ -165,6 +165,36 @@ def test_second_urdf_robot_loads_and_drives():
     assert abs(rob.body_velocity()[0] - 0.8) < 0.1 and abs(rob.pose()[1]) < 0.1
 
 
+def test_dem_patches_load_as_real_terrain():
+    from terrain3d.terrain import dem_patch
+
+    path = "experiments/maps/swissalti3d_bern.npz"
+    z = dem_patch(path, n=65, size=20.0, index=0)
+    assert z.shape == (65, 65) and abs(z.mean()) < 1e-3 and np.ptp(z) > 0.3
+    assert dem_patch(path, n=129, size=20.0, index=0).shape == (129, 129)
+    assert not np.allclose(dem_patch(path, 65, 20.0, seed=1), dem_patch(path, 65, 20.0, seed=2))
+    with pytest.raises(ValueError):
+        dem_patch(path, n=65, size=40.0)                      # patches are 20 m: a 40 m map would stretch them
+    terrain = make_terrain({"size": 20.0, "n": 65, "elevation": {"type": "dem", "path": path, "index": 0}, "ground": "grass"})
+    assert np.isclose(terrain.height(0.0, 0.0), z[32, 32], atol=1e-6)
+
+
+def test_earthrover_mini_plus_urdf_matches_published_size():
+    from terrain3d.world import ROOT, RobotSpec
+
+    spec = RobotSpec(urdf=ROOT / "robots" / "earthrover_mini_plus.urdf", wheel_radius=0.0475, track=0.14, max_wheel_speed=30.0)
+    rob = WheeledRobot(Terrain.uniform("grass", flat(65), 20.0), spec, start=(-6.0, 0.0))
+    assert sorted(rob.sides) == [-1, -1, 1, 1]
+    assert abs(rob.model.body_subtreemass[rob.body_id] - 1.4) < 1e-6        # ~1.4 kg (FrodoBots)
+    rob.step(250)
+    assert abs(rob.pose()[2] - 0.08) < 0.01                  # chassis 45 mm above the ground, as published
+    x0 = rob.pose()[0]
+    for _ in range(150):
+        rob.command(1.0, 0.0)
+        rob.step(10)
+    assert rob.pose()[0] - x0 > 2.4                          # ~1 m/s, the 4 km/h top speed class
+
+
 def test_gps_fix_updates_at_gps_rate():
     from terrain3d.env import NavConfig
 

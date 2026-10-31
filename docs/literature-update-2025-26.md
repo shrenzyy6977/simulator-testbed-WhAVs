@@ -157,8 +157,8 @@ Our own numbers quoted below come from `experiments/results/rq1/` and `rq3/` (Ap
 - **Approach:** a diffusion model generates new off-road terrains that adapt to the current policy's
   performance; policies trained this way beat ones trained on procedural or natural terrains.
 - **Relevance to our project:** our maps are random cosine hills. Adaptive terrain generation would
-  be a natural next step for training, and real elevation maps (`terrain3d.terrain.from_file`) for
-  evaluation.
+  be a natural next step for training, and real elevation maps (now 20 m swissALTI3D patches,
+  `elevation: {type: dem}`) for evaluation.
 
 ## 4. Data for the ERC setting
 
@@ -183,7 +183,7 @@ comparison (URBAN-SIM renders RGB-D, we render nothing during training).
 | | Verti-Bench | URBAN-SIM | Wheeled Lab | MVSim (base) | Ours (`terrain3d`) |
 |---|---|---|---|---|---|
 | Engine | Chrono (CPU) | PhysX 5 / Omniverse (GPU) | Isaac Lab (GPU) | Box2D + custom wheel model | MuJoCo 3 (CPU) |
-| Terrain | 100 off-road worlds | generated city scenes | indoor ramps, carpet | 2.5D elevation maps | heightfield maps: hills, slopes, image / `.npy` |
+| Terrain | 100 off-road worlds | generated city scenes | indoor ramps, carpet | 2.5D elevation maps | heightfield maps: hills, slopes, image / `.npy`, real swissALTI3D patches |
 | Ground properties | 7 rigid classes (friction), 3 deformable (SCM) | friction per texture (8) | one randomised friction | per-wheel friction model | 6 classes: friction, torsional, rolling resistance, softness |
 | Deformable soil | yes (SCM) | no | no | no | no (soft-contact proxy) |
 | Robots from URDF | no (C++ classes) | yes | Isaac Lab assets | no (XML) | yes (two rovers) |

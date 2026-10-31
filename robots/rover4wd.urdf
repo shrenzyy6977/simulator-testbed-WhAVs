@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<!-- Small 4WD skid-steer sidewalk rover, roughly the size class of the Earth Rover Mini+.
-     Dimensions and masses are approximate placeholders until we have the real robot's data. -->
+<!-- Generic small 4WD skid-steer sidewalk rover (the default robot of every experiment so far).
+     Dimensions and masses are placeholders; the real Earth Rover Mini+ is earthrover_mini_plus.urdf. -->
 <robot name="rover4wd">
   <mujoco>
     <compiler discardvisual="false" fusestatic="false" balanceinertia="true"/>

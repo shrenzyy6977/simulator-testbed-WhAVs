@@ -1,0 +1,15 @@
+# Real elevation patches for the 3D simulator, cut from one swissALTI3D tile (swisstopo's 0.5 m
+# bare-earth elevation model; free open data, attribution "(c) swisstopo").
+# Regenerate with: python scripts/fetch_dem.py   (downloads the 20.8 MB tile into data/dem/ once)
+source: https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2019_2599-1196/swissalti3d_2019_2599-1196_0.5_2056_5728.xyz.zip
+attribution: "swissALTI3D (c) swisstopo, tile 2599-1196 (south of Bern), 2019"
+raw: data/dem/swissalti3d_2019_2599-1196_0.5_2056_5728.xyz.zip
+resolution: 0.5          # [m] grid spacing of the tile
+patch_size: 20.0         # [m] side of a map; must match the env's terrain size
+n: 65                    # samples per side after resampling (the env's heightfield)
+count: 40                # patches to keep
+max_slope_deg: 20.0      # keep patches whose 95th-percentile slope is below this (the rover stalls near 25 deg)
+min_relief: 0.3          # [m] and whose height range is at least this, so they are not just flat roads
+seed: 0
+out: experiments/maps/swissalti3d_bern.npz
+figure: experiments/results/dem/patches.png

@@ -86,7 +86,30 @@ def from_file(path: str | Path) -> np.ndarray:
     return np.flipud(img.astype(float))
 
 
-ELEVATIONS = {"flat": flat, "hills": hills, "slope": slope}
+def dem_patch(path: str | Path, n: int, size: float, index: int | None = None, seed: int = 0) -> np.ndarray:
+    """One real elevation patch from a .npz made by scripts/fetch_dem.py (stack `elevation`
+    [k, m, m] of zero-mean heights [m] over squares of side `patch_size`). `index` picks a patch;
+    otherwise the seed picks one and a random multiple of 90 deg rotation, so real ground is reused
+    in 4 orientations. The patch is resampled to n x n."""
+    from scipy.interpolate import RegularGridInterpolator
+
+    path = Path(path)
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[2] / path
+    d = np.load(path)
+    if not np.isclose(float(d["patch_size"]), size):
+        raise ValueError(f"{path.name} holds {float(d['patch_size']):g} m patches but the map is {size:g} m")
+    rng = np.random.default_rng(seed)
+    k = int(rng.integers(len(d["elevation"]))) if index is None else int(index)
+    z = np.rot90(d["elevation"][k], int(rng.integers(4)) if index is None else 0)
+    if z.shape[0] != n:
+        u = np.linspace(0.0, 1.0, z.shape[0])
+        g = np.linspace(0.0, 1.0, n)
+        z = RegularGridInterpolator((u, u), z)(np.stack(np.meshgrid(g, g, indexing="ij"), -1))
+    return z.astype(float)
+
+
+ELEVATIONS = {"flat": flat, "hills": hills, "slope": slope, "dem": dem_patch}
 
 
 # --------------------------------------------------------------------------- terrain
@@ -176,6 +199,7 @@ def make_terrain(cfg: dict) -> Terrain:
     """Build a Terrain from a config dict, e.g.
         {size: 20, n: 129, elevation: {type: hills, amplitude: 0.4, seed: 1},
          ground: sand}                                  # uniform
+      or elevation: {type: dem, path: experiments/maps/<name>.npz}   # real terrain patches
       or ground: {patches: [grass, sand, mud], tiles: 4, seed: 0}
       or ground: {grid: [[asphalt, grass], [sand, mud]]}
     """

@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<!-- FrodoBots EarthRover Mini+ (the Earth Rover Challenge robot), as a rigid 4-wheel skid-steer model.
+
+     From FrodoBots' published specifications (help-centre comparison table and shop page):
+       overall 250 mm long x 190 mm wide x 195 mm high, ~1.4 kg (main body), 45 mm ground clearance,
+       4 wheels (the SDK logs 4 wheel RPMs), dual brushless motors (one per side, turns on the spot),
+       top speed 4 km/h (software-capped).
+     Estimated from the side and front product photos, scaled by the published length and width:
+       tyre diameter ~95 mm, tyre width ~50 mm, wheelbase ~155 mm (155 + 95 = 250 mm overall),
+       track ~140 mm (140 + 50 = 190 mm overall).
+     Simplifications: the coil-spring suspension is rigid; the chassis is two boxes and a camera post;
+     the mass split (1.0 kg body, 4 x 0.1 kg wheels) is a guess. -->
+<robot name="earthrover_mini_plus">
+  <mujoco>
+    <compiler discardvisual="false" fusestatic="false" balanceinertia="true"/>
+  </mujoco>
+
+  <!-- base_link origin: centre of the lower chassis, 80 mm above the ground -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0.01"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.0025" iyy="0.0045" izz="0.0050" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <collision>   <!-- lower chassis between the wheels: bottom at 45 mm ground clearance -->
+      <geometry><box size="0.20 0.07 0.07"/></geometry>
+    </collision>
+    <collision>   <!-- top cover, overhanging the wheels -->
+      <origin xyz="0 0 0.055"/>
+      <geometry><box size="0.21 0.13 0.04"/></geometry>
+    </collision>
+    <collision>   <!-- camera post: top at 195 mm -->
+      <origin xyz="-0.06 0 0.095"/>
+      <geometry><cylinder radius="0.012" length="0.04"/></geometry>
+    </collision>
+    <visual>
+      <geometry><box size="0.20 0.07 0.07"/></geometry>
+    </visual>
+    <visual>
+      <origin xyz="0 0 0.055"/>
+      <geometry><box size="0.21 0.13 0.04"/></geometry>
+    </visual>
+  </link>
+
+  <!-- wheels: radius 0.0475 m, width 0.05 m; axle 32.5 mm below base_link so the tyres touch the ground -->
+  <link name="wheel_left_front">
+    <inertial><mass value="0.1"/><inertia ixx="7.7e-5" iyy="1.13e-4" izz="7.7e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0475" length="0.05"/></geometry></collision>
+  </link>
+  <link name="wheel_right_front">
+    <inertial><mass value="0.1"/><inertia ixx="7.7e-5" iyy="1.13e-4" izz="7.7e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0475" length="0.05"/></geometry></collision>
+  </link>
+  <link name="wheel_left_rear">
+    <inertial><mass value="0.1"/><inertia ixx="7.7e-5" iyy="1.13e-4" izz="7.7e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0475" length="0.05"/></geometry></collision>
+  </link>
+  <link name="wheel_right_rear">
+    <inertial><mass value="0.1"/><inertia ixx="7.7e-5" iyy="1.13e-4" izz="7.7e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0475" length="0.05"/></geometry></collision>
+  </link>
+
+  <joint name="wheel_left_front_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_left_front"/>
+    <origin xyz="0.0775 0.07 -0.0325"/><axis xyz="0 1 0"/>
+  </joint>
+  <joint name="wheel_right_front_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_right_front"/>
+    <origin xyz="0.0775 -0.07 -0.0325"/><axis xyz="0 1 0"/>
+  </joint>
+  <joint name="wheel_left_rear_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_left_rear"/>
+    <origin xyz="-0.0775 0.07 -0.0325"/><axis xyz="0 1 0"/>
+  </joint>
+  <joint name="wheel_right_rear_joint" type="continuous">
+    <parent link="base_link"/><child link="wheel_right_rear"/>
+    <origin xyz="-0.0775 -0.07 -0.0325"/><axis xyz="0 1 0"/>
+  </joint>
+</robot>
