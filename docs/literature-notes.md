@@ -2,6 +2,8 @@
 
 Drafted from the paper. Read the paper yourself and edit these notes so they reflect your understanding.
 
+For simulators and benchmarks from 2025–26 (the review's main gap), see `literature-update-2025-26.md`.
+
 ## 1. MVSim (base paper)
 - **Citation:** J.-L. Blanco-Claraco, B. Tymchenko, F. J. Mañas-Alvarez, F. Cañadas-Aránega, Á. López-Gázquez, J. C. Moreno, "MultiVehicle Simulator (MVSim): Lightweight dynamics simulator for multiagents and mobile robotics research", SoftwareX 23 (2023) 101443.
 - **Link:** https://doi.org/10.1016/j.softx.2023.101443 · code: https://github.com/MRPT/mvsim · docs: https://mvsimulator.readthedocs.io

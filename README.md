@@ -20,6 +20,9 @@ Topic and base work were confirmed with our TA.
 - **Base paper:** J.-L. Blanco-Claraco et al., "MultiVehicle Simulator (MVSim): Lightweight dynamics simulator for multiagents and mobile robotics research", SoftwareX 23 (2023) 101443, https://doi.org/10.1016/j.softx.2023.101443
 - **Base code:** https://github.com/MRPT/mvsim (docs: https://mvsimulator.readthedocs.io)
 - **Scope / our contribution:** TODO (fill in once agreed with the TA)
+- **Related work (2025–26):** `docs/literature-update-2025-26.md` covers Verti-Bench, URBAN-SIM,
+  Wheeled Lab, Vid2Sim, NavBench-GS, MuJoCo Playground, mjlab, Isaac Lab, Chrono::CRM, ADEPT and
+  FrodoBots-2K, with a comparison table against our simulator.
 
 ## Repository layout
 
