@@ -8,6 +8,7 @@ base:                          # NavConfig fields of the simplest env
   grounds: [grass]
   tiles: 1
   gps_noise: 0.0
+  gps_hz: 10.0                 # a fresh GPS fix every control step
   delay_steps: 0
   max_steps: 300               # episode length of the random policy, so resets are part of the cost
 ladder:                        # cumulative: each level adds its fields to all previous ones
@@ -17,8 +18,9 @@ ladder:                        # cumulative: each level adds its fields to all p
   - name: + 16 ground-class tiles
     tiles: 4
     grounds: [asphalt, grass, gravel, sand, snow, mud]
-  - name: + GPS noise, bias, control delay
+  - name: + GPS noise, bias, 1 Hz rate, delay
     gps_noise: 0.3
+    gps_hz: 1.0
     gps_bias: 0.3
     delay_steps: 1
   - name: + randomisation, new map every episode

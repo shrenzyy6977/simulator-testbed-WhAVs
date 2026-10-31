@@ -100,7 +100,7 @@ def test_nav_env_api_and_determinism():
     check_env(env, skip_render_check=True)
     o1, _ = env.reset(seed=3)
     o2, _ = RoverNavEnv().reset(seed=3)
-    assert o1.shape == (11,) and np.allclose(o1, o2)
+    assert o1.shape == (12,) and np.allclose(o1, o2)
 
 
 def test_nav_env_randomisation_and_time_budget():
@@ -146,3 +146,18 @@ def test_second_urdf_robot_loads_and_drives():
         rob.command(0.8, 0.0)
         rob.step(10)
     assert abs(rob.body_velocity()[0] - 0.8) < 0.1 and abs(rob.pose()[1]) < 0.1
+
+
+def test_gps_fix_updates_at_gps_rate():
+    from terrain3d.env import NavConfig
+
+    env = RoverNavEnv(NavConfig(gps_noise=0.5, gps_hz=1.0, control_hz=10.0, delay_steps=0))
+    env.reset(seed=2)
+    fixes, ages = [env.fix.copy()], []
+    for _ in range(20):
+        obs, *_ = env.step(np.array([1.0, 0.0], np.float32))
+        fixes.append(env.fix.copy())
+        ages.append(round(float(obs[-1]), 3))
+    changed = [i for i in range(1, 21) if not np.allclose(fixes[i], fixes[i - 1])]
+    assert changed == [10, 20]                                 # a new fix every 10 control steps
+    assert ages[:10] == [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.0]

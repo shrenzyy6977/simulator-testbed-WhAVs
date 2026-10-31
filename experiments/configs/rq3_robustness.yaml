@@ -9,9 +9,9 @@ mission:                       # shared by every condition (NavConfig fields)
   checkpoint_radius: 0.75
   max_steps: 900               # upper bound; the real budget comes from min_avg_speed
   min_avg_speed: 0.6           # [m/s] time budget = route length / 0.6 m/s (v_max is 1.0 m/s)
-conditions:
-  nominal:                     # what a simple 2D-style simulator offers: one flat ground, perfect GPS, no delay
-    {grounds: [grass], amplitude_range: [0.0, 0.0], gps_noise: 0.0, delay_steps: 0}
+conditions:                    # every condition but nominal uses the Earth Rover's 1 Hz GPS (NavConfig default)
+  nominal:                     # what a simple 2D-style simulator offers: one flat ground, perfect GPS every step, no delay
+    {grounds: [grass], amplitude_range: [0.0, 0.0], gps_noise: 0.0, gps_hz: 10.0, delay_steps: 0}
   randomized:                  # training distribution of the upgraded simulator
     {grounds: [asphalt, grass, gravel, sand], amplitude_range: [0.0, 0.35], gps_noise_range: [0.0, 0.5],
      gps_bias: 0.3, delay_range: [0, 2]}

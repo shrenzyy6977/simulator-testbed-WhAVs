@@ -130,7 +130,7 @@ package because it needs MuJoCo; `src/testbed` stays plain numpy/scipy.
 | Ground classes | `terrain3d/terrain.py` | asphalt, grass, gravel, sand, snow, mud: sliding / torsional / rolling friction and contact softness (sinkage proxy). Values are placeholders to calibrate |
 | Robot | `robots/rover4wd.urdf`, `robots/rover6wd.urdf`, `terrain3d/world.py` | Any URDF with joints named `wheel_*` is loaded with MjSpec, gets a free base and velocity-controlled wheel motors (skid steering) |
 | Classical baselines | `terrain3d/tracking.py` | The four controllers from `src/testbed` drive the robot unchanged (steering output -> yaw-rate command) |
-| RL interface | `terrain3d/env.py` | `RoverNavEnv`: reach GNSS checkpoints with noisy GPS (0.3 m), 10 Hz control, 1-step control delay; random map and ground patches per episode |
+| RL interface | `terrain3d/env.py` | `RoverNavEnv`: reach GNSS checkpoints with noisy GPS (0.3 m) at 1 Hz like the Earth Rover (the observation includes the age of the fix), 10 Hz control, 1-step control delay; random map and ground patches per episode |
 
 ```bash
 python scripts/terrain_benchmark.py          # 4 controllers x 6 ground classes x 3 paths
@@ -154,9 +154,9 @@ First results (`experiments/results/terrain_benchmark/summary.md`), s-curve at 0
   ground class, and on the circle Pure Pursuit is best on most grounds. The ranking depends on the
   ground and the path, which is RQ2 of the review.
 - Speed: median ~130x real time per run on one CPU core (physics at 500 Hz); the Gym env runs
-  ~1,600 steps/s single-threaded and ~5,000 steps/s with 8 processes on an M4 (details in RQ1 below).
-- PPO baseline: 500k steps (105 s, 8 processes) reach all 3 checkpoints in 60/60 evaluation
-  episodes on unseen random maps (`experiments/results/ppo/eval.csv`). The current mission is
+  ~1,600 steps/s single-threaded and ~5,900 steps/s with 8 processes on an M4 (details in RQ1 below).
+- PPO baseline: 500k steps (under 3 min, 8 processes) reach all 3 checkpoints in 49/50 evaluation
+  episodes on unseen random maps with 1 Hz GPS (`experiments/results/ppo/eval.csv`). The current mission is
   clearly too easy (checkpoints 3-6 m apart, gentle hills); harder ERC/URC-style missions are next.
 
 ### RQ3: does training in the upgraded simulator make policies more robust?
@@ -165,37 +165,37 @@ First results (`experiments/results/terrain_benchmark/summary.md`), s-curve at 0
 PPO in two simulators and evaluates it, together with a classical go-to-goal controller
 (`terrain3d/baselines.py`), on 4-checkpoint missions with a time budget of route length / 0.6 m/s:
 
-- **nominal** training: one flat ground (grass), perfect GPS, no delay, i.e. what a simple simulator offers.
+- **nominal** training: one flat ground (grass), perfect GPS with a fresh fix every control step,
+  no delay, i.e. what a simple simulator offers.
 - **randomised** training: asphalt / grass / gravel / sand patches, hills up to 0.35 m, GPS noise
-  0-0.5 m plus a 0.3 m bias, 0-2 steps of control delay.
+  0-0.5 m plus a 0.3 m bias at the Earth Rover's 1 Hz, 0-2 steps of control delay.
 
-Success rate (all 4 checkpoints in time), 50 identical episodes per condition, PPO 1M steps,
-mean ± std over 10 seeds:
+Every condition except nominal uses the 1 Hz GPS. Success rate (all 4 checkpoints in time), 50
+identical episodes per condition, PPO 1M steps, mean ± std over 10 seeds:
 
 | Policy | nominal | randomised | held-out ground (snow, mud) | steep hills (0.55-0.7 m) | high noise (1 m GPS, 3-step delay) |
 |---|---|---|---|---|---|
-| Go-to-goal | 100% | 98% | 26% | 62% | 62% |
-| PPO, nominal training | 100% ± 0 | 98% ± 2 | 20% ± 7 | 70% ± 4 | 63% ± 8 |
-| PPO, randomised training | 100% ± 0 | 99% ± 1 | 26% ± 7 | 73% ± 2 | **71% ± 7** |
+| Go-to-goal | 100% | 94% | 18% | 66% | 36% |
+| PPO, nominal training | 100% ± 0 | 97% ± 3 | 28% ± 7 | 70% ± 3 | 49% ± 7 |
+| PPO, randomised training | 100% ± 1 | 99% ± 1 | 23% ± 6 | 73% ± 4 | 55% ± 7 |
 
 Randomised minus nominal PPO, with the 10 per-seed success rates as samples (Welch's t-test):
 
 | | held-out ground | steep hills | high noise |
 |---|---|---|---|
-| difference | +6.2 points | +3.0 points | **+8.8 points** |
-| p | 0.057 | 0.063 | **0.019** |
+| difference | -4.6 points | +2.2 points | +5.2 points |
+| p | 0.136 | 0.164 | 0.112 |
 
-- Randomised training makes PPO more robust to sensor noise and delay beyond the training range:
-  +8.8 points (71% vs 63%), significant at the 5% level with seeds as the unit.
-- On unseen grounds (+6.2) and steeper hills (+3.0) it also helps, but not significantly with 10
-  seeds. Randomising hills up to 0.35 m did not buy much extra hill skill.
-- Against the classical go-to-goal baseline: PPO trained in the simple simulator only wins on steep
-  hills (70% vs 62%), ties on high noise (63% vs 62%) and loses on unseen grounds (20% vs 26%).
-  Trained with randomisation it wins on steep hills and high noise (73%, 71% vs 62%) and ties on
-  unseen grounds (26%).
-- With 3 seeds the high-noise gap looked bigger (73% vs 61%); 10 seeds shrank the estimate,
-  which is why more seeds were needed.
-- Snow and mud stay hard for everyone (20-26%): in our ground model those surfaces have low
+- With the 1 Hz GPS, randomised training gives no significant extra robustness: it gains on high
+  noise (+5.2 points) and steep hills (+2.2) and loses on unseen grounds (-4.6), none significant at
+  the 5% level with seeds as the unit.
+- Both PPO policies beat the classical go-to-goal controller on every hard condition, most clearly
+  under heavy noise (49% and 55% vs 36%). Go-to-goal steers at each noisy fix for a whole second;
+  its high-noise success fell from 62% with a fresh fix every step to 36% at 1 Hz.
+- The GPS rate changed the conclusion: when every condition had a fresh fix each step, randomised
+  training was significantly more robust to noise (+8.8 points, p = 0.019, 10 seeds). The sensor
+  model is part of what decides which policy looks best, which is the question RQ2 asks.
+- Snow and mud stay hard for everyone (18-28%): in our ground model those surfaces have low
   traction and high rolling resistance, so steep climbs often cannot be done within the time budget.
 
 ### RQ1: do the new features keep training throughput practical?
@@ -206,21 +206,21 @@ features one at a time and measures RoverNavEnv steps/s (random actions, resets 
 
 | Env (cumulative) | steps/s, 1 process | x real time | map rebuild [ms] |
 |---|---|---|---|
-| flat, one ground | 2,045 | 205 | 2.4 |
-| + hills (65 x 65 heightfield) | 1,854 | 185 | 2.6 |
-| + 16 ground-class tiles | 1,724 | 172 | 3.3 |
-| + GPS noise, bias, control delay | 1,688 | 169 | 3.3 |
-| + randomisation, new map every episode | 1,618 | 162 | 3.6 |
-| + 6-wheel rover (`robots/rover6wd.urdf`) | 1,157 | 116 | 4.1 |
+| flat, one ground | 2,071 | 207 | 2.4 |
+| + hills (65 x 65 heightfield) | 1,879 | 188 | 2.6 |
+| + 16 ground-class tiles | 1,738 | 174 | 3.3 |
+| + GPS noise, bias, 1 Hz rate, control delay | 1,743 | 174 | 3.3 |
+| + randomisation, new map every episode | 1,635 | 163 | 3.7 |
+| + 6-wheel rover (`robots/rover6wd.urdf`) | 1,164 | 116 | 4.2 |
 
 - All features together keep 79% of the simplest env's throughput. Perception noise and delay are
   almost free; the heightfield and the ground-class tiles cost most (contacts against 16 geoms).
 - A second robot loads from its URDF with no code change (wheel joints named `wheel_left_*` /
   `wheel_right_*`); with 6 wheels instead of 4 the env is 29% slower (more contacts).
-- Heightfield resolution: 65 / 129 / 257 samples per side give 1,625 / 1,388 / 1,118 steps/s.
-- Processes: 1 / 2 / 4 / 8 workers give 1,519 / 2,639 / 4,382 / 5,154 steps/s (8 workers is 3.4x
-  one; the M4 has 4 performance cores). PPO with 8 workers trains at 4,451 steps/s, so 1M steps
-  take 3.7 min; training the 20 RQ3 policies took about 80 min.
+- Heightfield resolution: 65 / 129 / 257 samples per side give 1,643 / 1,409 / 1,094 steps/s.
+- Processes: 1 / 2 / 4 / 8 workers give 1,498 / 2,653 / 4,448 / 5,885 steps/s (8 workers is 3.9x
+  one; the M4 has 4 performance cores). PPO with 8 workers trains at 4,753 steps/s, so 1M steps
+  take 3.5 min; training the 20 RQ3 policies took about 75 min.
 - Answer to RQ1: yes on this laptop. Throughput stays above 100x real time per process with every
   feature on, and training a policy takes minutes, not hours.
 

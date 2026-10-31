@@ -2,12 +2,14 @@
 
 The robot must reach a sequence of GNSS checkpoints. Like the Earth Rover Challenge interface,
 the policy only sees a noisy GPS fix, the heading, its own speeds and the last command, at a
-fixed control rate and with a configurable control delay.
+fixed control rate and with a configurable control delay. The GPS updates at `gps_hz` (1 Hz on the
+Earth Rover, per the FrodoBots-2K logs); between fixes the goal is computed from the last fix and the
+current heading, and the observation says how old the fix is.
 
     action  a in [-1, 1]^2   ->  v = a0 v_max,  omega = a1 omega_max
     obs     [goal_x, goal_y] in the body frame from noisy GPS (m), distance (m),
             sin/cos of the bearing error, forward speed (m/s), yaw rate (rad/s),
-            roll, pitch (rad), previous action (2)                                  -> 11 values
+            roll, pitch (rad), previous action (2), age of the GPS fix (s)          -> 12 values
     reward  10 * (d_prev - d)  - 0.01 per step  + 10 per checkpoint  - 10 if flipped / out of map
 
 Domain randomisation (NavConfig *_range fields) samples hill height per map and GPS noise and
@@ -41,6 +43,7 @@ class NavConfig:
     delay_steps: int = 1              # control delay in control periods
     gps_noise: float = 0.3            # [m] white noise per fix
     gps_bias: float = 0.0             # [m] std of a constant per-episode offset (multipath, bad fix)
+    gps_hz: float = 1.0               # GPS fix rate; >= control_hz gives a fresh fix every step
     max_steps: int = 600
     min_avg_speed: float | None = None      # [m/s] if set, the time budget is route length / this speed
     # Domain randomisation: when set, sampled uniformly per map / per episode and override the above.
@@ -58,7 +61,7 @@ class RoverNavEnv(gym.Env):
         self.cfg = config or NavConfig()
         self.render_mode = render_mode
         self.action_space = spaces.Box(-1.0, 1.0, (2,), np.float32)
-        self.observation_space = spaces.Box(-np.inf, np.inf, (11,), np.float32)
+        self.observation_space = spaces.Box(-np.inf, np.inf, (12,), np.float32)
         self.robot: WheeledRobot | None = None
         self._episodes = 0
         self._renderer = None
@@ -107,12 +110,12 @@ class RoverNavEnv(gym.Env):
         rob = self.robot
         _, _, _, roll, pitch, yaw = rob.pose()
         v, _, omega = rob.body_velocity()
-        d = self.checkpoints[self.target] - self._gps()
+        d = self.checkpoints[self.target] - self.fix
         c, s = np.cos(yaw), np.sin(yaw)
         gx, gy = c * d[0] + s * d[1], -s * d[0] + c * d[1]
         bearing = np.arctan2(gy, gx)
         return np.array([gx, gy, np.hypot(gx, gy), np.sin(bearing), np.cos(bearing), v, omega, roll, pitch,
-                         *self.last_action], dtype=np.float32)
+                         *self.last_action, self.fix_age / self.cfg.control_hz], dtype=np.float32)
 
     def _true_dist(self) -> float:
         x, y, *_ = self.robot.pose()
@@ -138,6 +141,8 @@ class RoverNavEnv(gym.Env):
         self.gps_offset = self.np_random.normal(0, c.gps_bias, 2) if c.gps_bias > 0 else np.zeros(2)
         self.delay = int(self.np_random.integers(c.delay_range[0], c.delay_range[1] + 1)) if c.delay_range else c.delay_steps
         self.queue = [np.zeros(2)] * self.delay
+        self.fix_period = max(1, int(round(c.control_hz / c.gps_hz)))    # control steps between fixes
+        self.fix, self.fix_age = self._gps(), 0
         self.prev_dist = self._true_dist()
         return self._obs(), {"ground": self.robot.ground().name}
 
@@ -149,6 +154,9 @@ class RoverNavEnv(gym.Env):
         rob.command(applied[0] * c.v_max, applied[1] * c.omega_max)
         rob.step(max(1, int(round(1.0 / (c.control_hz * rob.dt)))))
         self.last_action, self.steps = a, self.steps + 1
+        self.fix_age += 1
+        if self.fix_age >= self.fix_period:
+            self.fix, self.fix_age = self._gps(), 0
 
         d = self._true_dist()
         reward = 10.0 * (self.prev_dist - d) - 0.01

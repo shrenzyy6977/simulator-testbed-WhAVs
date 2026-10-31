@@ -171,8 +171,9 @@ Our own numbers quoted below come from `experiments/results/rq1/` and `rq3/` (Ap
   Lin and Visser (arXiv:2407.05735, 2024) use it for visual SLAM and add recordings from the ERC at
   ICRA@40.
 - **Relevance to our project:** the logs for the review's third baseline, and the data to calibrate
-  skid-steer turning (wheel RPM against GPS / IMU motion). **Mismatch to fix:** our env gives a GPS
-  fix every 0.1 s, but the real robot's GPS runs at 1 Hz. The control rate (10 Hz) already matches.
+  skid-steer turning (wheel RPM against GPS / IMU motion). Our env first gave a GPS fix every
+  0.1 s; it now uses the real 1 Hz rate (`NavConfig.gps_hz`), with the fix age in the observation.
+  The control rate (10 Hz) already matched.
 
 ## 5. Comparison with our simulator
 
@@ -186,7 +187,7 @@ comparison (URBAN-SIM renders RGB-D, we render nothing during training).
 | Ground properties | 7 rigid classes (friction), 3 deformable (SCM) | friction per texture (8) | one randomised friction | per-wheel friction model | 6 classes: friction, torsional, rolling resistance, softness |
 | Deformable soil | yes (SCM) | no | no | no | no (soft-contact proxy) |
 | Robots from URDF | no (C++ classes) | yes | Isaac Lab assets | no (XML) | yes (two rovers) |
-| Perception noise | no (ground truth) | RGB-D rendered; noise not described | obs. noise, image augmentation | camera, RGB-D, LiDAR simulated | GPS noise and bias, control delay |
+| Perception noise | no (ground truth) | RGB-D rendered; noise not described | obs. noise, image augmentation | camera, RGB-D, LiDAR simulated | GPS noise and bias at 1 Hz, control delay |
 | Speed | 0.4–1.5x real time | up to 2,620 FPS, 256 envs, L40S | not reported | slower than real time on our hardware (week 1) | 162x real time per process; 5,154 steps/s with 8 processes on an M4 |
 | Baselines | 10 (classical, RL, hybrid) | PPO per robot | RL policy vs. baseline, 3 tasks | none | 4 path trackers, go-to-goal, PPO (2 training regimes) |
 
@@ -200,8 +201,10 @@ comparison (URBAN-SIM renders RGB-D, we render nothing during training).
   every feature on, but with a simpler (non-deformable) ground model and no camera.
 - **What the literature says we still lack:** deformable soil (out of scope), camera observations
   (URBAN-SIM, Wheeled Lab), GPU parallelism (MuJoCo Warp / mjlab is the route), calibration against
-  real logs (FrodoBots-2K) and a GPS rate that matches the real robot (1 Hz).
+  real logs (FrodoBots-2K).
 - **Findings to connect in the report:** Verti-Bench's RL baseline fails badly (10% success), and
-  Wheeled Lab finds that too-wide friction randomisation hurts. Our RQ3 sits in between: PPO trained
-  with randomisation is significantly more robust to noise (+8.8 points, p = 0.019), but the gains on
-  unseen ground are small.
+  Wheeled Lab finds that too-wide friction randomisation hurts. Our RQ3 sits in between: with the
+  Earth Rover's 1 Hz GPS, both PPO policies beat a classical go-to-goal controller under heavy noise
+  (49–55% vs 36%), but randomised training gives no significant extra robustness (+5.2 points on
+  noise, p = 0.11; −4.6 on unseen ground). With a fresh fix every step it had been significant
+  (+8.8 points, p = 0.019), so the GPS model alone changes the conclusion.
