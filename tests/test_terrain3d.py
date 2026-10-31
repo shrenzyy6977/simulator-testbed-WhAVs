@@ -195,6 +195,44 @@ def test_earthrover_mini_plus_urdf_matches_published_size():
     assert rob.pose()[0] - x0 > 2.4                          # ~1 m/s, the 4 km/h top speed class
 
 
+def _earthrover(lateral_friction: float, start_yaw: float = 0.0):
+    from terrain3d.world import ROOT, RobotSpec
+
+    spec = RobotSpec(urdf=ROOT / "robots" / "earthrover_mini_plus.urdf", wheel_radius=0.0475, track=0.14,
+                     max_wheel_speed=30.0, lateral_friction=lateral_friction)
+    rob = WheeledRobot(Terrain.uniform("asphalt", flat(65), 20.0), spec, start=(0.0, 0.0), start_yaw=start_yaw)
+    rob.step(250)
+    return rob
+
+
+def test_tyre_contacts_follow_the_wheel():
+    rob = _earthrover(0.5, start_yaw=0.5)
+    mujoco.mj_step1(rob.model, rob.data)
+    assert rob._tyre_contacts()
+    c = rob.data.contact
+    t1 = c.frame[:, 3:6]
+    assert np.allclose(np.arctan2(t1[:, 1], t1[:, 0]) % np.pi, 0.5, atol=0.02)    # rolling direction = heading
+    assert np.allclose(np.einsum("ij,ij->i", c.frame[:, 0:3], t1), 0.0, atol=1e-9)  # orthogonal to the normal
+    assert np.allclose(c.friction[:, 1], 0.5 * c.friction[:, 0])
+
+
+def test_calibrated_tyres_let_the_earthrover_turn():
+    rates = {}
+    for ratio in (1.0, 0.41):
+        rob = _earthrover(ratio)
+        for _ in range(15):
+            rob.command(0.0, 2.0)
+            rob.step(50)
+        rates[ratio] = rob.body_velocity()[2]
+    assert rates[0.41] > 2.0 * rates[1.0] > 0                 # isotropic Coulomb contacts barely turn it (wheelbase > track)
+    rob = _earthrover(0.41)
+    x0 = rob.pose()[0]
+    for _ in range(20):
+        rob.command(1.0, 0.0)
+        rob.step(50)
+    assert rob.pose()[0] - x0 > 1.5 and abs(rob.pose()[1]) < 0.1   # still drives straight
+
+
 def test_gps_fix_updates_at_gps_rate():
     from terrain3d.env import NavConfig
 

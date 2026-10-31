@@ -4,6 +4,16 @@ The robot is loaded with MjSpec from its URDF, attached under a free joint, and 
 joint gets a velocity actuator (like the velocity-controlled hub motors of small rovers).
 Wheel joints are found by name (`wheel_<side>...`): names containing `l` / `r` after `wheel_`
 choose the side for skid steering, e.g. wheel_fl_joint, wheel_rl_joint, wheel_left_joint.
+
+Tyre friction anisotropy (`RobotSpec.lateral_friction` < 1): MuJoCo's contact friction is isotropic
+in a world-fixed tangent frame, so a 4-wheel skid-steer whose wheelbase L exceeds its track B
+cannot turn on the spot: with all load on the corner wheels it needs
+
+    mu_lateral / mu_longitudinal < B / L                           (Coulomb skid-steer turning)
+
+Real tyres grip less sideways than forwards. Each physics step we therefore align every wheel
+contact's first tangent with the wheel's rolling direction, t1 = axle x n, t2 = n x t1, and scale the
+friction along t2 by `lateral_friction`, between collision detection and the constraint solver.
 """
 from __future__ import annotations
 
@@ -29,6 +39,7 @@ class RobotSpec:
     kv: float = 2.0                 # velocity actuator gain [N m s/rad]
     max_torque: float = 2.0         # [N m] per wheel
     max_wheel_speed: float = 25.0   # [rad/s]
+    lateral_friction: float = 1.0   # tyre sideways / forward friction ratio; 1 = MuJoCo's isotropic contacts
 
 
 def _wheel_side(joint_name: str) -> int | None:
@@ -97,6 +108,12 @@ class WheeledRobot:
         self.sides = np.array([s for _, s in wheels], dtype=float)
         self.wheel_dof = np.array([self.model.jnt_dofadr[self.model.actuator_trnid[i, 0]] for i in self.act_ids])
         self.body_id = self.model.body("robot/" + self.robot.base_link).id
+        # wheel geom -> its wheel joint, for the anisotropic tyre contacts
+        wheel_jnt = {int(self.model.jnt_bodyid[self.model.actuator_trnid[i, 0]]): int(self.model.actuator_trnid[i, 0])
+                     for i in self.act_ids}
+        self.geom_jnt = np.full(self.model.ngeom, -1)
+        for g in range(self.model.ngeom):
+            self.geom_jnt[g] = wheel_jnt.get(int(self.model.geom_bodyid[g]), -1)
         self.qpos0 = self.data.qpos.copy()
         mujoco.mj_forward(self.model, self.data)
 
@@ -116,7 +133,37 @@ class WheeledRobot:
         self.data.ctrl[self.act_ids] = np.clip(w, -r.max_wheel_speed, r.max_wheel_speed)
 
     def step(self, n: int = 1) -> None:
-        mujoco.mj_step(self.model, self.data, nstep=n)
+        if self.robot.lateral_friction >= 1.0:
+            mujoco.mj_step(self.model, self.data, nstep=n)
+            return
+        m, d = self.model, self.data
+        for _ in range(n):
+            mujoco.mj_step1(m, d)                  # ... collision and constraints
+            if self._tyre_contacts():
+                mujoco.mj_makeConstraint(m, d)     # rebuild the constraints from the edited contacts
+                mujoco.mj_island(m, d)
+                mujoco.mj_projectConstraint(m, d)
+                mujoco.mj_referenceConstraint(m, d)
+            mujoco.mj_step2(m, d)
+
+    def _tyre_contacts(self) -> bool:
+        """Align wheel contacts with the wheel (t1 = rolling direction) and reduce the sideways friction."""
+        d = self.data
+        if d.ncon == 0:
+            return False
+        con = d.contact
+        jnt = np.maximum(self.geom_jnt[con.geom1], self.geom_jnt[con.geom2])
+        k = np.flatnonzero(jnt >= 0)
+        if k.size == 0:
+            return False
+        frame, fric = con.frame, con.friction
+        n = frame[k, 0:3]
+        t1 = np.cross(d.xaxis[jnt[k]], n)
+        t1 /= np.linalg.norm(t1, axis=1, keepdims=True)
+        frame[k, 3:6] = t1
+        frame[k, 6:9] = np.cross(n, t1)
+        fric[k, 1] = fric[k, 0] * self.robot.lateral_friction
+        return True
 
     # ------------------------------------------------------------------ state
     def pose(self) -> tuple[float, float, float, float, float, float]:

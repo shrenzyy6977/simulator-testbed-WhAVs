@@ -180,13 +180,49 @@ Challenge robot, as a rigid 4-wheel skid-steer:
   and the mass split (1.0 kg body, 4 x 0.1 kg wheels) is a guess.
 - **Driving:** the model sits at the published 45 mm clearance and reaches the commanded 1 m/s on
   firm ground (0.7 m/s on sand, 0.5 m/s on mud). It climbs 20° grass slopes and stalls near 25°.
-- **Known limitation, turning:** turning on the spot reaches only 0.2-0.4 rad/s of a commanded
-  2 rad/s.
-  - The wheelbase is longer than the track, so with MuJoCo's hard Coulomb contacts the wheels'
-    drive force barely overcomes the sideways scrubbing.
-  - More motor torque does not help, and a stiffer wheel-speed loop makes it worse.
-  - The real robot turns on the spot on soft knobbly tyres. Calibrating this against FrodoBots
-    logs is the next fix; until then the Earth Rover's mission results are pessimistic.
+- **Turning, calibrated on a real Mini+:** see "Skid-steer turning calibration" below. Settings:
+  `lateral_friction: 0.41` and, in the env, `omega_max: 3.33` (the firmware's full spin command).
+
+#### Skid-steer turning calibration
+
+The problem: with all its weight on four corner wheels, a skid-steer can only turn on the spot if
+sideways grip / forward grip < track / wheelbase (Coulomb friction). That is 140 / 155 = 0.9 for
+the Mini+. MuJoCo's contact friction is the same in every direction (ratio 1), so the model could
+barely turn (0.2-0.4 rad/s for a commanded 2 rad/s); more torque did not help.
+
+The fix (`RobotSpec.lateral_friction`, `terrain3d/world.py`): every physics step, between collision
+detection and the solver, each wheel contact's friction directions are turned to follow the wheel
+(rolling direction first) and the sideways coefficient is scaled by the ratio. The default 1.0
+keeps MuJoCo's own contacts, so the other robots and all earlier results are unchanged. It costs
+about 2.5x per physics step, for the robots that use it only.
+
+Calibration (`scripts/calibrate_turning.py`, settings `experiments/configs/turning_calibration.yaml`):
+
+- **Wheel speeds, from FrodoBots' open-source firmware** (`motor.c`, `pid.c`): turning on the spot
+  at command c drives each side at 0.3 x 0.7 x |c| x 1.11 m/s. Pure rolling would then give
+  3.33 rad/s per unit command, which becomes the Earth Rover's `omega_max`.
+- **Real yaw rate, from a log:** 41 spin-in-place bursts of a real Mini+ driven indoors, measured
+  from its compass heading ([cagataydev/scout-earthrover-ecot](https://huggingface.co/datasets/cagataydev/scout-earthrover-ecot),
+  MIT).
+  - 18 bursts are clean (turned the commanded way by at least 20°, nothing else commanded). The log's
+    gyroscope columns are all zero, and 12 bursts turned the wrong way (indoor compass), so this is
+    weak evidence.
+  - Clean bursts: 1.17 rad/s per unit command (quartiles 0.80-2.54), a skid factor of 2.8: the
+    real robot turns 2.8x slower than its wheels' rolling would suggest.
+- **Model fit:** the model flies the same bursts on hard ground for a range of ratios. A
+  sideways/forward ratio of **0.41** reproduces the median, and the quartiles give 0.63 to below 0.25.
+  With equal grip (1.0) the model turned 2.7x slower than the real robot.
+
+| Earth Rover Mini+, simple flat missions, 20 each | go-to-goal | Stanley |
+|---|---|---|
+| equal sideways and forward grip | 13/20, 36.8 s | 15/20, 34.5 s |
+| calibrated (0.41, firmware command scale) | 20/20, 28.0 s | 20/20, 26.2 s |
+
+![Turning calibration](experiments/results/turning/calibration.png)
+
+Limits: one indoor log, compass only; the firmware mixes arcs differently (it scales both sides
+together) from our env's additive mixing, so only turning on the spot is calibrated. The FrodoBots
+outdoor logs with wheel RPM (FrodoBots-Mini-4K) would pin this down much better.
 
 Real terrain: `scripts/fetch_dem.py` (settings: `experiments/configs/dem_swissalti3d.yaml`) downloads one
 1 km tile of swissALTI3D (swisstopo's 0.5 m bare-earth elevation model, free open data) south of Bern.
@@ -237,21 +273,21 @@ sensing:
 | 6-wheel rover | 1.00 [0.52, 1.00] | PPO, nominal | 86% |
 | **all upgrades** (hills, 6 grounds, noisy 1 Hz GPS, delay) | **0.52 [0.24, 0.62]** | **PPO, randomised** | **25%** |
 | real terrain (swissALTI3D patches) | 0.90 [0.62, 1.00] | PPO, nominal | 84% |
-| Earth Rover Mini+ (flat, perfect GPS) | 0.71 [0.33, 0.90] | PPO, nominal | 79% |
-| **ERC-like** (Earth Rover Mini+, real terrain, asphalt / grass / gravel, noisy 1 Hz GPS, delay) | **0.62 [0.52, 0.98]** | PPO, nominal | 60% |
+| Earth Rover Mini+ (flat, perfect GPS, calibrated turning) | 0.33 [0.33, 0.62] | PPO, randomised | 44% |
+| **ERC-like** (Earth Rover Mini+, real terrain, asphalt / grass / gravel, noisy 1 Hz GPS, delay) | **0.33 [0.05, 0.52]** | **PPO, randomised** | **25%** |
 | simple, new missions (control) | 1.00 [0.81, 1.00] | PPO, nominal | 82% |
 
 Rank by SCT (success rate):
 
 | Policy | simple | all upgrades | ERC-like |
 |---|---|---|---|
-| PPO, nominal training | 1 (100%) | 2 (73%) | 1 (33%) |
-| PPO, randomised training | 2 (100%) | **1 (78%)** | 2 (33%) |
-| Stanley | 3 (100%) | 4 (60%) | 5 (10%) |
-| LQR | 4 (100%) | 5 (56%) | 4 (10%) |
-| MPC | 5 (100%) | 6 (54%) | 3 (10%) |
-| Pure Pursuit | 6 (100%) | 7 (34%) | 7 (0%) |
-| Go-to-goal | 7 (100%) | **3 (72%)** | 6 (2%) |
+| PPO, nominal training | 1 (100%) | 2 (73%) | 2 (42%) |
+| PPO, randomised training | 2 (100%) | **1 (78%)** | **1 (45%)** |
+| Stanley | 3 (100%) | 4 (60%) | 6 (26%) |
+| LQR | 4 (100%) | 5 (56%) | 4 (30%) |
+| MPC | 5 (100%) | 6 (54%) | 5 (26%) |
+| Pure Pursuit | 6 (100%) | 7 (34%) | 7 (24%) |
+| Go-to-goal | 7 (100%) | **3 (72%)** | **3 (40%)** |
 
 - **Single upgrades barely reorder the policies.**
   - Hills, ground classes and the second robot stay within the re-test band.
@@ -267,23 +303,26 @@ Rank by SCT (success rate):
 - **Real terrain alone does not reorder them; the Earth Rover does.**
   - On the real swissALTI3D patches every policy still succeeds 96-98% of the time, and tau stays
     within the re-test band.
-  - Swapping in the Earth Rover Mini+ model drops success to 38-82%. Tau falls below the control's in
-    95% of resamples.
-  - In the ERC-like setting the classical controllers nearly all fail (0-10%), while PPO reaches 33%
-    and beats each of them in every resample. Most failures are timeouts: the Earth Rover model turns
-    slowly (see its section above), so these numbers depend on that uncalibrated turning.
-  - Go-to-goal, third with all upgrades on the 4-wheel rover, is sixth in the ERC-like setting. The
-    best classical controller depends on the robot as well as on the sensing.
+  - With calibrated turning, the Earth Rover Mini+ alone keeps success at 97-100% but reorders the
+    policies: tau 0.33, below the control's in every resample.
+  - The ERC-like setting is the hardest: 24-45% success. Randomised PPO is first (45%), nominal PPO
+    second, and go-to-goal third (40%), ahead of every path tracker. Go-to-goal beats Stanley in 99% of
+    resamples; randomised PPO beats go-to-goal in 97%.
+  - About a third of its failures are tip-overs or leaving the map (the 1.4 kg rover has a 14 cm track
+    and rigid suspension in the model); the rest are timeouts.
+  - Before calibration the Earth Rover turned 2.7x too slowly, timeouts dominated, and go-to-goal
+    looked sixth. Calibrating one physical parameter changed that conclusion, so simulator
+    calibration matters for RQ2 as much as the sensing upgrades do.
 - **The simple simulator barely separates the policies.**
   - All succeed, and scores span only 0.08 (0.88-0.96). With all upgrades they span 0.36.
   - A team choosing a classical controller in the simple simulator would pick Stanley; with all
-    upgrades on the 4-wheel rover the answer is go-to-goal, and on the Earth Rover none of them work
-    well.
-- **PPO is on top in both.** Randomised training overtakes nominal training with all upgrades in
-  89% of resamples, which is suggestive but not conclusive (RQ3 agrees).
+    upgrades the answer is go-to-goal, on both the 4-wheel rover and the calibrated Earth Rover.
+- **PPO is on top in every simulator**, including the ERC-like one on a robot it never trained on.
+  Randomised training overtakes nominal training with all upgrades (89% of resamples) and in the
+  ERC-like setting (87%), which is suggestive but not conclusive (RQ3 agrees).
 - **Answer to RQ2:** yes, but through the combination of upgrades and the robot model, not through
   any single sensing or terrain upgrade. Evaluating only in a simple simulator would pick the wrong
-  classical controller.
+  classical controller, and so would an uncalibrated robot model.
 - **Caveats:**
   - PPO (nominal) was trained in the simple simulator, so it has a home advantage there.
   - The trackers' adapter (straight legs, rotate on the spot) is one reasonable design among several.
@@ -360,11 +399,11 @@ features one at a time and measures RoverNavEnv steps/s (random actions, resets 
 ![RQ1 throughput](experiments/results/rq1/throughput.png)
 
 Known limitations (to fix or calibrate next):
-- Skid-steer turning: with MuJoCo's contact model the rover reaches only part of the commanded yaw
-  rate, worst on high-friction ground (asphalt), which is why every controller does badly there. Needs
-  calibration against real data (e.g. FrodoBots logs) before drawing conclusions about asphalt.
-  The Earth Rover Mini+ model is hit hardest (0.2-0.4 rad/s of a commanded 2 rad/s), since its
-  wheelbase is longer than its track.
+- Skid-steer turning: with MuJoCo's isotropic contacts the generic rovers reach only part of the
+  commanded yaw rate, worst on high-friction ground (asphalt), which is why every controller does
+  badly there. The Earth Rover Mini+ is calibrated (sideways/forward tyre friction 0.41, from one
+  indoor log); `rover4wd` and `rover6wd` still use isotropic contacts, so all earlier results stand
+  as they were.
 - Ground parameters are plausible placeholders, not measured values; sinkage is approximated by soft
   contacts, there is no deformable soil.
 - The Earth Rover Mini+ URDF follows the published size, mass and clearance, but tyre size, wheel

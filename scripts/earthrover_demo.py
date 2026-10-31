@@ -38,11 +38,12 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
-    robot = RobotSpec(urdf=ROOT / "robots" / "earthrover_mini_plus.urdf", wheel_radius=0.0475, track=0.14, max_wheel_speed=30.0)
+    robot = RobotSpec(urdf=ROOT / "robots" / "earthrover_mini_plus.urdf", wheel_radius=0.0475, track=0.14, max_wheel_speed=30.0,
+                      lateral_friction=0.41)                      # turning calibrated by scripts/calibrate_turning.py
     env = RoverNavEnv(NavConfig(terrain={"size": 20.0, "n": 65, "elevation": {"type": "dem", "path": DEM}},
                                 grounds=["asphalt", "grass", "gravel"], n_checkpoints=4, checkpoint_spacing=(4.0, 8.0),
                                 checkpoint_radius=0.75, max_steps=900, min_avg_speed=0.6, gps_noise=0.5, gps_bias=0.3,
-                                gps_hz=1.0, delay_steps=2, robot=robot))
+                                gps_hz=1.0, delay_steps=2, robot=robot, omega_max=3.33))
     if args.policy == "go_to_goal":
         policy, name = GoToGoal(), "go_to_goal"
     else:

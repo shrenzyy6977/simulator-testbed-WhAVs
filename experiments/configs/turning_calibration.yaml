@@ -1,0 +1,20 @@
+# Skid-steer turning calibration of the Earth Rover Mini+ model against a real Mini+ log.
+# Regenerate with: python scripts/calibrate_turning.py   (needs pyarrow >= 20 to read the log once)
+log:
+  url: https://huggingface.co/datasets/cagataydev/scout-earthrover-ecot/resolve/main/data/chunk-000/file-000.parquet
+  raw: data/logs/scout-earthrover-ecot/file-000.parquet     # 215 kB, MIT; indoor apartment driving, 10 Hz
+  attribution: "cagataydev/scout-earthrover-ecot (MIT), EarthRover Mini+ driven indoors"
+bursts:                      # spin-in-place commands (linear 0, |angular| > 0.1)
+  lag_s: 0.8                 # heading is read this long after the command ends (compass ~2 Hz, motor spin-down)
+  min_turn_deg: 20           # keep bursts that turned the commanded way by at least this...
+                             # ...with no other turn command in the lag window
+firmware:                    # frodobots-org/earth-rover-mini, Software/STM32/applications
+  spin_duty_per_cmd: 0.7     # motor.c motor_get_duty: duty = coeff_angular (0.7) * |steer|, steer = 100 * cmd
+  spin_target_scale: 0.3     # motor.c motor_move_left/right: PID target = 0.3 * MIX_TARGET * duty / 100 on level ground
+  full_speed: 1.11           # [m/s] pid.c MIX_TARGET = 991 "roughly 4 km/h" at 100 % duty
+robot: {urdf: robots/earthrover_mini_plus.urdf, wheel_radius: 0.0475, track: 0.14, max_wheel_speed: 30.0}
+ground: asphalt              # hard ground, closest of our classes to the indoor floor of the log
+ratios: [1.0, 0.8, 0.6, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25]    # sideways / forward tyre friction to simulate
+commands: [0.4, 0.5, 0.6, 0.7]                               # spin commands to simulate (as in the log)
+burst_s: 1.2                 # simulated burst length (median of the real clean bursts)
+out: experiments/results/turning
